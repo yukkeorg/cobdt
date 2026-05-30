@@ -1,0 +1,163 @@
+package cobol
+
+import (
+	"bytes"
+	"testing"
+)
+
+func TestParseField(t *testing.T) {
+	tests := []struct {
+		name string
+		def  string
+		want Field
+	}{
+		{"EMP-ID", "9(5)", Field{Type: TypeNumeric, IntDigits: 5, Usage: UsageDisplay}},
+		{"SALARY", "S9(7)V99 COMP-3", Field{Type: TypeNumeric, Signed: true, IntDigits: 7, DecDigits: 2, Usage: UsagePacked}},
+		{"RATE", "S9(1)V99", Field{Type: TypeNumeric, Signed: true, IntDigits: 1, DecDigits: 2, Usage: UsageDisplay}},
+		{"NAME", "X(20)", Field{Type: TypeAlphanumeric, Length: 20, Usage: UsageDisplay}},
+		{"KANJI", "N(8)", Field{Type: TypeJapanese, Length: 8, Usage: UsageDisplay}},
+		{"DIGITS", "999", Field{Type: TypeNumeric, IntDigits: 3, Usage: UsageDisplay}},
+		{"MIX", "9(3)V9", Field{Type: TypeNumeric, IntDigits: 3, DecDigits: 1, Usage: UsageDisplay}},
+		{"", "FILLER(3)", Field{Type: TypeAlphanumeric, Length: 3, Usage: UsageDisplay, Filler: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, err := ParseField(tt.name, tt.def)
+			if err != nil {
+				t.Fatalf("ParseField(%q) error: %v", tt.def, err)
+			}
+			if f.Type != tt.want.Type || f.Signed != tt.want.Signed ||
+				f.IntDigits != tt.want.IntDigits || f.DecDigits != tt.want.DecDigits ||
+				f.Length != tt.want.Length || f.Usage != tt.want.Usage ||
+				f.Filler != tt.want.Filler {
+				t.Errorf("ParseField(%q) = %+v, want fields %+v", tt.def, f, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseFieldErrors(t *testing.T) {
+	bad := []string{"", "Z(3)", "SX(4)", "SN(2)", "9(3) BOGUS", "X(4) COMP-3", "9(32)", "9(20)V9(12)"}
+	for _, def := range bad {
+		if _, err := ParseField("F", def); err == nil {
+			t.Errorf("ParseField(%q) expected error, got nil", def)
+		}
+	}
+}
+
+func TestFieldSize(t *testing.T) {
+	cases := []struct {
+		def  string
+		want int
+	}{
+		{"9(5)", 5},            // ゾーン10進数: 5 桁 = 5 バイト
+		{"S9(7)V99 COMP-3", 5}, // パック: 9 桁 -> 9/2+1 = 5 バイト
+		{"X(20)", 20},          // 英数字
+		{"N(8)", 16},           // 日本語: 1 文字 2 バイト
+	}
+	for _, c := range cases {
+		f, err := ParseField("F", c.def)
+		if err != nil {
+			t.Fatalf("ParseField(%q): %v", c.def, err)
+		}
+		if got := f.Size(); got != c.want {
+			t.Errorf("Size(%q) = %d, want %d", c.def, got, c.want)
+		}
+	}
+}
+
+func TestEncodeDecodeRoundTrip(t *testing.T) {
+	cases := []struct {
+		def      string
+		value    string
+		wantBack string
+	}{
+		{"9(5)", "123", "00123"},
+		{"S9(7)V99 COMP-3", "1234567.89", "1234567.89"},
+		{"S9(7)V99 COMP-3", "-42.5", "-0000042.50"},
+		{"S9(1)V99", "-1.25", "-1.25"},
+		{"S9(1)V99", "0.5", "0.50"},
+		{"X(10)", "Alice", "Alice"},
+		{"N(8)", "山田太郎", "山田太郎"},
+	}
+	for _, c := range cases {
+		f, err := ParseField("F", c.def)
+		if err != nil {
+			t.Fatalf("ParseField(%q): %v", c.def, err)
+		}
+		enc, err := Encode(f, c.value)
+		if err != nil {
+			t.Fatalf("Encode(%q, %q): %v", c.def, c.value, err)
+		}
+		if got := f.Size(); got != len(enc) {
+			t.Errorf("Encode(%q) length = %d, Size() = %d", c.def, len(enc), got)
+		}
+		back, err := Decode(f, enc)
+		if err != nil {
+			t.Fatalf("Decode(%q): %v", c.def, err)
+		}
+		if back != c.wantBack {
+			t.Errorf("round trip %q value %q = %q, want %q", c.def, c.value, back, c.wantBack)
+		}
+	}
+}
+
+func TestEncodeFigurative(t *testing.T) {
+	fx, _ := ParseField("F", "X(3)")
+	fn, _ := ParseField("F", "9(3)")
+	fnat, _ := ParseField("F", "N(2)")
+
+	cases := []struct {
+		field *Field
+		value string
+		want  []byte
+	}{
+		{fx, "SPACE", []byte("   ")},
+		{fx, "SPACES", []byte("   ")},
+		{fx, "ZERO", []byte("000")},
+		{fx, "zero", []byte("000")}, // ケースインセンシティブ
+		{fn, "ZERO", []byte("000")},
+		{fn, "ZEROS", []byte("000")},
+		{fn, "ZEROES", []byte("000")},
+		{fnat, "SPACE", []byte{0x81, 0x40, 0x81, 0x40}}, // 全角空白
+		{fnat, "ZERO", []byte{0x82, 0x4f, 0x82, 0x4f}},  // 全角ゼロ
+	}
+	for _, c := range cases {
+		got, err := Encode(c.field, c.value)
+		if err != nil {
+			t.Fatalf("Encode(%q): %v", c.value, err)
+		}
+		if !bytes.Equal(got, c.want) {
+			t.Errorf("Encode(%s, %q) = % x, want % x", c.field.Raw, c.value, got, c.want)
+		}
+	}
+}
+
+func TestEncodeZonedOverpunch(t *testing.T) {
+	f, _ := ParseField("F", "S9(3)")
+	enc, _ := Encode(f, "-1")
+	// "001" の最下位桁 '1' (0x31) が 0x70+1 = 0x71 にオーバーパンチされる
+	want := []byte{'0', '0', 0x71}
+	if !bytes.Equal(enc, want) {
+		t.Errorf("Encode signed zoned = % x, want % x", enc, want)
+	}
+}
+
+func TestEncodePackedSignNibble(t *testing.T) {
+	// S9(3) COMP-3: 3 桁 -> 2 バイト。正の符号ニブルは 0x0C、負は 0x0D。
+	f, _ := ParseField("F", "S9(3) COMP-3")
+	pos, _ := Encode(f, "123")
+	if pos[len(pos)-1]&0x0F != 0x0C {
+		t.Errorf("positive sign nibble = %x, want C", pos[len(pos)-1]&0x0F)
+	}
+	neg, _ := Encode(f, "-123")
+	if neg[len(neg)-1]&0x0F != 0x0D {
+		t.Errorf("negative sign nibble = %x, want D", neg[len(neg)-1]&0x0F)
+	}
+	// 符号なしは 0x0F
+	g, _ := ParseField("F", "9(3) COMP-3")
+	uns, _ := Encode(g, "123")
+	if uns[len(uns)-1]&0x0F != 0x0F {
+		t.Errorf("unsigned sign nibble = %x, want F", uns[len(uns)-1]&0x0F)
+	}
+}
