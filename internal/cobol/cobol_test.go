@@ -102,6 +102,34 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestFlattenItems(t *testing.T) {
+	mk := func(name, def string) *Field {
+		f, err := ParseField(name, def)
+		if err != nil {
+			t.Fatalf("ParseField(%q): %v", def, err)
+		}
+		return f
+	}
+	// ID, LINE OCCURS 2 { CODE, QTY OCCURS 2 }
+	items := []*Item{
+		{Leaf: mk("ID", "9(3)")},
+		{Group: "LINE", Occurs: 2, Children: []*Item{
+			{Leaf: mk("CODE", "X(2)")},
+			{Leaf: mk("QTY", "9(2)"), Occurs: 2},
+		}},
+	}
+	want := []string{"ID", "CODE(1)", "QTY(1, 1)", "QTY(1, 2)", "CODE(2)", "QTY(2, 1)", "QTY(2, 2)"}
+	got := FlattenItems(items)
+	if len(got) != len(want) {
+		t.Fatalf("FlattenItems len = %d, want %d", len(got), len(want))
+	}
+	for i, w := range want {
+		if got[i].Name != w {
+			t.Errorf("field[%d].Name = %q, want %q", i, got[i].Name, w)
+		}
+	}
+}
+
 func TestEncodeFigurative(t *testing.T) {
 	fx, _ := ParseField("F", "X(3)")
 	fn, _ := ParseField("F", "9(3)")

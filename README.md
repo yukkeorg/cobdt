@@ -89,11 +89,16 @@ name: DATARECORD-NAME
 organization: ORGANIZATION
 n-encode: N-ENCODE
 record:
-    - GROUPNAME:
+    - type: GROUP
+      name: GROUP-NAME
+      subs:
         - type: TYPE(DIGIT)
           name: DATANAME
           usage: USAGE
           value: INITIAL-VALUE
+        - type: TYPE(DIGIT)
+          name: TABLE-DATANAME
+          occurs: OCCURS
         - type: FILLER(DIGIT)
           value: INITIAL-VALUE
     - type: TYPE(DIGIT)
@@ -103,7 +108,7 @@ record:
     - type: FILLER(DIGIT)
       value: INITIAL-VALUE
 data:
-    - [DATANAME-VALUE, FILLER-VALUE, ..., DATANAMEn-VALUE]
+    - [DATANAME-VALUE, [TABLE-VALUE-1, ...], FILLER-VALUE, ..., DATANAMEn-VALUE]
     - [ ... ]
 ```
 
@@ -121,8 +126,10 @@ data:
 
 ### 項目（record）
 
-- **集団項目（GROUPNAME）**: `type`・`usage` は持たず、子として集団項目・基本項目・FILLER を持てる。
-- **基本項目（DATANAME）**: `type`（必須）・`name`（必須）・`usage`・`value` を指定する。
+各項目は `type` を持ちます。`type: GROUP` なら集団項目、それ以外は基本項目／FILLER です。
+
+- **集団項目**: `type: GROUP`、`name`（必須）、`subs`（従属項目のリスト。必須）。`occurs` は任意。`usage`・`value` は持たない。
+- **基本項目**: `type`（必須）・`name`（必須）・`usage`・`value`・`occurs` を指定する。
 - **FILLER**: 無名項目。`type: FILLER(桁数)` で指定し、型は X として扱う。
 
 #### データ型（type）
@@ -133,8 +140,21 @@ data:
 | `X` | 英数字項目。左詰め、空き桁は半角空白埋め |
 | `N` | 日本語項目。文字コードは `n-encode`。左詰め、空き桁は全角空白埋め |
 | `FILLER` | 無名項目。桁数を指定でき、型は X |
+| `GROUP` | 集団項目。`name` と `subs`（従属項目）を持つ |
 
 `DIGIT` は桁数を表します。`9(3)` は `999` とも書けます。
+
+#### 表項目（occurs）
+
+`occurs` に要素数を指定すると、その項目を表（配列）として要素数ぶん繰り返します。基本項目・集団項目のどちらにも指定できます。
+`occurs` と `value` は同時に指定できません。
+
+`data` では表項目の値を入れ子のリストで指定します。
+
+- 基本項目の表: `[要素1, 要素2, ...]`
+- 集団項目の表: `[[従属1, 従属2], [従属1, 従属2], ...]`（繰り返しごとにネスト）
+
+ダンプ表示では各要素を `NAME(1)`, `NAME(2)` のように添字付きで表示します。
 
 #### 内部格納形式（usage）
 
@@ -167,7 +187,9 @@ name: EMP-RECORD
 organization: sequential
 n-encode: sjis
 record:
-    - EMP:
+    - type: GROUP
+      name: EMP
+      subs:
         - type: 9(5)
           name: EMP-ID
           value: 0
@@ -178,12 +200,14 @@ record:
     - type: S9(7)V99
       name: SALARY
       usage: COMP-3
-    - type: S9(1)V99
-      name: BONUS-RATE
+    - type: S9(3)V99
+      name: MONTHLY-SALES
+      occurs: 3
     - type: FILLER(3)
 data:
-    - [123, John Smith, 山田太郎, 1234567.89, -1.25, "***"]
-    - [7, Alice, 鈴木花子, -42.5, 0.5, "---"]
+    # MONTHLY-SALES は要素ごとのネストリストで指定する
+    - [123, John Smith, 山田太郎, 1234567.89, [10.5, 20.0, 30.25], "***"]
+    - [7, Alice, 鈴木花子, -42.5, [0, 1.5, 2], "---"]
 ```
 
 ## ライセンス

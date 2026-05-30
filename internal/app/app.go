@@ -25,10 +25,10 @@ func Create(configPath, outputPath string, stdout io.Writer) error {
 			return fmt.Errorf("data[%d]: 値の数 %d が項目数 %d と一致しません", rowIdx, len(values), len(spec.Fields))
 		}
 		var rec []byte
-		for i, f := range spec.Fields {
-			b, err := cobol.Encode(f, values[i])
+		for i, ff := range spec.Fields {
+			b, err := cobol.Encode(ff.Field, values[i])
 			if err != nil {
-				return fmt.Errorf("data[%d] %s: %w", rowIdx, f.DisplayName(), err)
+				return fmt.Errorf("data[%d] %s: %w", rowIdx, ff.Name, err)
 			}
 			rec = append(rec, b...)
 		}
@@ -65,17 +65,17 @@ func Dump(configPath, inputPath string, stdout io.Writer) error {
 	for idx, rec := range records {
 		fmt.Fprintf(stdout, "===== レコード %d =====\n", idx+1)
 		offset := 0
-		for _, f := range spec.Fields {
-			size := f.Size()
+		for _, ff := range spec.Fields {
+			size := ff.Field.Size()
 			if offset+size > len(rec) {
-				fmt.Fprintf(stdout, "  %-20s %-24s <レコード長不足>\n", f.DisplayName(), f.TypeName())
+				fmt.Fprintf(stdout, "  %-20s %-24s <レコード長不足>\n", ff.Name, ff.Field.TypeName())
 				break
 			}
-			val, err := cobol.Decode(f, rec[offset:offset+size])
+			val, err := cobol.Decode(ff.Field, rec[offset:offset+size])
 			if err != nil {
-				return fmt.Errorf("レコード %d %s: %w", idx+1, f.DisplayName(), err)
+				return fmt.Errorf("レコード %d %s: %w", idx+1, ff.Name, err)
 			}
-			fmt.Fprintf(stdout, "  %-20s %-24s %s\n", f.DisplayName(), f.TypeName(), val)
+			fmt.Fprintf(stdout, "  %-20s %-24s %s\n", ff.Name, ff.Field.TypeName(), val)
 			offset += size
 		}
 	}

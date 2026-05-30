@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	yaml "go.yaml.in/yaml/v4"
@@ -16,21 +17,21 @@ import (
 // rawConfig は設定 YAML 全体のマッピングを表す。
 // name / organization / n-encode / record / data はいずれもトップレベルのキー。
 type rawConfig struct {
-	Name         string     `yaml:"name"`
-	Organization string     `yaml:"organization"`
-	NEncode      string     `yaml:"n-encode"`
-	Record       yaml.Node  `yaml:"record"` // 並び順と構造を保つため Node のまま受け取る
-	Data         [][]string `yaml:"data"`   // 各レコードは値のシーケンス（ブロック形式 / フロー形式）
+	Name         string    `yaml:"name"`
+	Organization string    `yaml:"organization"`
+	NEncode      string    `yaml:"n-encode"`
+	Record       yaml.Node `yaml:"record"` // 並び順と構造を保つため Node のまま受け取る
+	Data         yaml.Node `yaml:"data"`   // 表項目は入れ子になりうるため Node のまま受け取る
 }
 
 // Spec は YAML から取り出した、create / dump / create-copybook に必要な情報一式。
 type Spec struct {
 	Name         string          // レコード名（DATARECORD-NAME）
 	Organization datafile.Organization
-	NEncode      cobol.NEncoding // N（日本語）項目の文字エンコード
-	Items        []*cobol.Item   // record の木構造（集団項目を保持）
-	Fields       []*cobol.Field  // Items をフラット化した葉項目（create / dump 用）
-	Rows         [][]string      // データ行（各行は項目値のリスト）
+	NEncode      cobol.NEncoding  // N（日本語）項目の文字エンコード
+	Items        []*cobol.Item    // record の木構造（集団項目・表を保持）
+	Fields       []cobol.FlatField // Items をフラット化した葉項目（create / dump 用）
+	Rows         [][]string        // データ行（各行はフラット化した項目値のリスト）
 }
 
 // Load は設定 YAML を読み込み Spec を構築する。
@@ -65,10 +66,15 @@ func Load(path string) (*Spec, error) {
 	}
 
 	// n-encode は record 全体に適用される設定。N 項目へ伝搬する。
-	for _, f := range fields {
-		if f.Type == cobol.TypeJapanese {
-			f.NEncode = nenc
+	for _, ff := range fields {
+		if ff.Field.Type == cobol.TypeJapanese {
+			ff.Field.NEncode = nenc
 		}
+	}
+
+	rows, err := parseDataRows(&cfg.Data)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Spec{
@@ -77,11 +83,11 @@ func Load(path string) (*Spec, error) {
 		NEncode:      nenc,
 		Items:        items,
 		Fields:       fields,
-		Rows:         cfg.Data,
+		Rows:         rows,
 	}, nil
 }
 
-// itemsFromRecord は record シーケンスを木構造（集団項目を保持）へ解析する。
+// itemsFromRecord は record シーケンスを木構造（集団項目・表を保持）へ解析する。
 func itemsFromRecord(node *yaml.Node) ([]*cobol.Item, error) {
 	if node.Kind != yaml.SequenceNode {
 		return nil, fmt.Errorf("record はシーケンスである必要があります")
@@ -102,41 +108,67 @@ func parseItemNodes(seq *yaml.Node) ([]*cobol.Item, error) {
 	return items, nil
 }
 
-// parseItem は record の 1 要素を解析する。type キーを持てば基本項目／FILLER、
-// 持たなければ「集団項目名: 子シーケンス」の集団項目とみなす。
+// parseItem は record の 1 要素を解析する。
+// type が GROUP なら集団項目、それ以外は基本項目／FILLER とみなす。
 func parseItem(node *yaml.Node) (*cobol.Item, error) {
 	if node.Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("record の項目はマッピングである必要があります")
 	}
 	m := nodeMap(node)
 
-	if typeNode, ok := m["type"]; ok {
-		f, err := parseLeaf(typeNode, m)
-		if err != nil {
-			return nil, err
-		}
-		return &cobol.Item{Leaf: f}, nil
+	typeNode, ok := m["type"]
+	if !ok {
+		return nil, fmt.Errorf("record の項目には type が必要です")
 	}
+	typ := strings.TrimSpace(typeNode.Value)
 
-	// 集団項目: 単一キー（集団項目名）の値が子シーケンス。
-	if len(node.Content) != 2 {
-		return nil, fmt.Errorf("集団項目は「名前: 子項目のリスト」の形式である必要があります")
-	}
-	groupName := node.Content[0].Value
-	children := node.Content[1]
-	if children.Kind != yaml.SequenceNode {
-		return nil, fmt.Errorf("集団項目 %s の子項目はシーケンスである必要があります", groupName)
-	}
-	childItems, err := parseItemNodes(children)
+	occurs, err := parseOccurs(m)
 	if err != nil {
 		return nil, err
 	}
-	return &cobol.Item{Group: groupName, Children: childItems}, nil
+
+	if strings.EqualFold(typ, "GROUP") {
+		return parseGroup(m, occurs)
+	}
+
+	f, err := parseLeaf(typ, m)
+	if err != nil {
+		return nil, err
+	}
+	if occurs > 0 && f.HasValue {
+		return nil, fmt.Errorf("項目 %s: occurs と value は同時に指定できません", f.DisplayName())
+	}
+	return &cobol.Item{Leaf: f, Occurs: occurs}, nil
+}
+
+// parseGroup は集団項目（type: GROUP）を解析する。name と subs は必須。
+func parseGroup(m map[string]*yaml.Node, occurs int) (*cobol.Item, error) {
+	name := strings.TrimSpace(valueOf(m, "name"))
+	if name == "" {
+		return nil, fmt.Errorf("集団項目(GROUP)には name が必要です")
+	}
+	if _, ok := m["usage"]; ok {
+		return nil, fmt.Errorf("集団項目 %s に usage は指定できません", name)
+	}
+	if _, ok := m["value"]; ok {
+		return nil, fmt.Errorf("集団項目 %s に value は指定できません", name)
+	}
+	subsNode, ok := m["subs"]
+	if !ok || subsNode.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("集団項目 %s には subs（従属項目のリスト）が必要です", name)
+	}
+	children, err := parseItemNodes(subsNode)
+	if err != nil {
+		return nil, err
+	}
+	if len(children) == 0 {
+		return nil, fmt.Errorf("集団項目 %s には従属項目が必要です", name)
+	}
+	return &cobol.Item{Group: name, Children: children, Occurs: occurs}, nil
 }
 
 // parseLeaf は基本項目／FILLER のマッピングから Field を構築する。
-func parseLeaf(typeNode *yaml.Node, m map[string]*yaml.Node) (*cobol.Field, error) {
-	typ := strings.TrimSpace(typeNode.Value)
+func parseLeaf(typ string, m map[string]*yaml.Node) (*cobol.Field, error) {
 	name := strings.TrimSpace(valueOf(m, "name"))
 	usage := strings.TrimSpace(valueOf(m, "usage"))
 
@@ -167,6 +199,52 @@ func parseLeaf(typeNode *yaml.Node, m map[string]*yaml.Node) (*cobol.Field, erro
 		f.HasValue = true
 	}
 	return f, nil
+}
+
+// parseOccurs は occurs キーを解釈する。未指定なら 0、指定があれば 1 以上の整数。
+func parseOccurs(m map[string]*yaml.Node) (int, error) {
+	n, ok := m["occurs"]
+	if !ok {
+		return 0, nil
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(n.Value))
+	if err != nil || v < 1 {
+		return 0, fmt.Errorf("occurs は 1 以上の整数で指定してください: %q", n.Value)
+	}
+	return v, nil
+}
+
+// parseDataRows は data シーケンスを解析する。各行は record の構造に合わせて
+// 入れ子になりうるため、再帰的にフラット化したスカラ値の並びへ変換する。
+func parseDataRows(node *yaml.Node) ([][]string, error) {
+	if node.Kind == 0 { // data 未指定
+		return nil, nil
+	}
+	if node.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("data はシーケンスである必要があります")
+	}
+	var rows [][]string
+	for _, rowNode := range node.Content {
+		if rowNode.Kind != yaml.SequenceNode {
+			return nil, fmt.Errorf("data の各行はシーケンスである必要があります")
+		}
+		var vals []string
+		flattenValueNode(rowNode, &vals)
+		rows = append(rows, vals)
+	}
+	return rows, nil
+}
+
+// flattenValueNode はデータ行の入れ子シーケンスを平坦なスカラ値の並びへ展開する。
+func flattenValueNode(node *yaml.Node, out *[]string) {
+	switch node.Kind {
+	case yaml.SequenceNode:
+		for _, c := range node.Content {
+			flattenValueNode(c, out)
+		}
+	case yaml.ScalarNode:
+		*out = append(*out, node.Value)
+	}
 }
 
 // nodeMap はマッピングノードを key->value ノードの対応表に変換する。

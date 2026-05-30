@@ -4,6 +4,7 @@ package cobol
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -87,27 +88,74 @@ type Field struct {
 
 // Item は record を構成する木構造の 1 ノード。
 // 集団項目のときは Group 名と Children を持ち、基本項目／FILLER のときは Leaf を持つ。
+// Occurs が 1 以上のとき、その項目は表（OCCURS）として要素数ぶん繰り返す。
 type Item struct {
 	Group    string  // 集団項目名（集団項目のとき非空）
 	Leaf     *Field  // 基本項目／FILLER（葉のとき非 nil）
 	Children []*Item // 集団項目の子項目
+	Occurs   int     // OCCURS 要素数。0 なら表ではない。
 }
 
 // IsGroup は集団項目なら true を返す。
 func (it *Item) IsGroup() bool { return it.Leaf == nil }
 
-// FlattenItems は record ツリーを葉項目（基本項目／FILLER）の並びへ展開する。
+// FlatField は record をフラット化した 1 つの基本項目。
+// 表項目（OCCURS）は要素ごとに展開され、Name に添字（"NAME(1)" など）が付く。
+type FlatField struct {
+	Field *Field
+	Name  string
+}
+
+// FlattenItems は record ツリーを葉項目の並びへ展開する。
+// OCCURS 指定された項目は要素数だけ繰り返し、各葉に添字付きの表示名を与える。
 // 集団項目自身は値を持たないため展開結果には含まれない。
-func FlattenItems(items []*Item) []*Field {
-	var fields []*Field
+func FlattenItems(items []*Item) []FlatField {
+	var out []FlatField
+	flattenItems(items, nil, &out)
+	return out
+}
+
+func flattenItems(items []*Item, subs []int, out *[]FlatField) {
 	for _, it := range items {
-		if it.IsGroup() {
-			fields = append(fields, FlattenItems(it.Children)...)
-		} else {
-			fields = append(fields, it.Leaf)
+		if it.Occurs <= 0 {
+			flattenOne(it, subs, out)
+			continue
+		}
+		for i := 1; i <= it.Occurs; i++ {
+			flattenOne(it, appendInt(subs, i), out)
 		}
 	}
-	return fields
+}
+
+func flattenOne(it *Item, subs []int, out *[]FlatField) {
+	if it.IsGroup() {
+		flattenItems(it.Children, subs, out)
+		return
+	}
+	*out = append(*out, FlatField{
+		Field: it.Leaf,
+		Name:  it.Leaf.DisplayName() + formatSubscripts(subs),
+	})
+}
+
+// appendInt は s を変更せずに v を追加した新しいスライスを返す。
+func appendInt(s []int, v int) []int {
+	out := make([]int, len(s)+1)
+	copy(out, s)
+	out[len(s)] = v
+	return out
+}
+
+// formatSubscripts は添字列を "(1)" や "(2, 3)" の形式に整形する。
+func formatSubscripts(subs []int) string {
+	if len(subs) == 0 {
+		return ""
+	}
+	parts := make([]string, len(subs))
+	for i, v := range subs {
+		parts[i] = strconv.Itoa(v)
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
 }
 
 // DisplayName は dump 表示用の項目名を返す。FILLER 項目は "FILLER" を返す。
@@ -154,11 +202,11 @@ func (f *Field) TypeName() string {
 	return fmt.Sprintf("%s %s", f.Raw, usage)
 }
 
-// RecordLength は項目群が構成する固定長レコードのバイト数を返す。
-func RecordLength(fields []*Field) int {
+// RecordLength はフラット化した項目群が構成する固定長レコードのバイト数を返す。
+func RecordLength(fields []FlatField) int {
 	total := 0
-	for _, f := range fields {
-		total += f.Size()
+	for _, ff := range fields {
+		total += ff.Field.Size()
 	}
 	return total
 }

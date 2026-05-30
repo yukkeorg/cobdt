@@ -23,14 +23,20 @@ name: DATARECORD-NAME
 organization: ORGANIZATION
 n-encode: N-ENCODE
 record:
-    - GROUPNAME:
+    - type: GROUP
+      name: GROUP-NAME
+      subs:
         - type: TYPE(DIGIT)
           name: DATANAME
           usage: USAGE
           value: INITIAL-VALUE
+        - type: TYPE(DIGIT)
+          name: TABLE-DATANAME
+          usage: USAGE
+          occurs: OCCURS
+          value: INITIAL-VALUE
         - type: FILLER(DIGIT)
           value: INITIAL-VALUE
-        ...
     ...
     - type: TYPE(DIGIT)
       name: DATANAMEn
@@ -40,8 +46,7 @@ record:
       value: INITIAL-VALUE
     ... snip ...
 data:
-    - [DATANAME1-VALUE, FILLER-VALUE,  ... snip ..., DATANAMEn-VALUE, FILLER-VALUE, ... snip ...]
-    - [ ... ]
+    - [DATANAME1-VALUE, [TABLE-DATANAME-VALUE(1), ,,,], FILLER-VALUE,  ... snip ..., DATANAMEn-VALUE, FILLER-VALUE, ... snip ...]
     ...
 
 TYPE、ORGANAIZATION、N-ENCODEに指定される値は、ケースインセンシティブ(大文字小文字不問)である。
@@ -66,10 +71,6 @@ N-ENCODEには、N項目の文字エンコードを以下から指定できる�
 
 ### データ型
 
-GROUPNAME は集団項目を表す。TYPEやUSAGEは指定できない。子の情報として、集団項目、基本項目、または FILLER 項目を持つことができる。
-
-DATANAME は基本項目を表し、TYPEやUSAGEが指定され、具体的な値が入る。
-
 TYPE は基本項目の型を指定し、次に対応する。
 
 - 9: 数値項目。右詰め。空いた桁に0で埋める。小数部含めて最大31桁。
@@ -77,7 +78,8 @@ TYPE は基本項目の型を指定し、次に対応する。
   - V: 仮想小数点
 - X: 英数字項目。左詰め。空いた桁は半角空白で埋める。
 - N: 日本語項目。文字コードはN-ENCODEとする。左詰め。空いた桁は全角空白で埋める。
-- FILLER: 無名項目を表し、桁数を指定できる。型はXとする。
+- FILLER: 無名項目を表し、桁数を指定できる。型はXとする。 valueは任意。
+- GROU@: 集団項目を表す。 name、subs に 従属項目(集団項目、基本項目、または FILLER 項目)は必須、occursは任意。
 
 USAGE は数値項目(9)の内部格納形式を表し、次に対応する。指定がない場合はDISPLAYとする。数値項目以外のデータ項目には指定できない。
 
@@ -86,6 +88,8 @@ USAGE は数値項目(9)の内部格納形式を表し、次に対応する。�
 - COMP-3: パック10進数
 
 DIGIT は その項目の桁数を表す。9(3)は、999とも表現できる。
+
+OCCURS が指定されていた場合、その項目が表であるとともに要素数を表す。
 
 INITIAL-VALUE は 初期値を表す。指定されていない場合、数値項目はZERO、それ以外の項目はSPACEとする。
 ZERO(または、ZEROS, ZEROES)、SPACE(または、SPACES) が単独で出現した場合、COBOL言語における予約語と同様の扱いをおこなう。

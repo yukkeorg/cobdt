@@ -16,7 +16,7 @@ func Generate(recordName string, items []*cobol.Item) string {
 		recordName = "DATA-RECORD"
 	}
 	var b strings.Builder
-	writeGroupLine(&b, 0, 1, recordName)
+	writeGroupLine(&b, 0, 1, recordName, 0)
 	writeItems(&b, items, 1)
 	return b.String()
 }
@@ -26,29 +26,38 @@ func writeItems(b *strings.Builder, items []*cobol.Item, depth int) {
 	level := 2*depth + 1
 	for _, it := range items {
 		if it.IsGroup() {
-			writeGroupLine(b, depth, level, it.Group)
+			writeGroupLine(b, depth, level, it.Group, it.Occurs)
 			writeItems(b, it.Children, depth+1)
 		} else {
-			writeLeafLine(b, depth, level, it.Leaf)
+			writeLeafLine(b, depth, level, it.Leaf, it.Occurs)
 		}
 	}
 }
 
 // writeGroupLine は集団項目／レコード名の行（PICTURE 句なし）を書き出す。
-func writeGroupLine(b *strings.Builder, depth, level int, name string) {
-	fmt.Fprintf(b, "%s%02d  %s.\n", indent(depth), level, name)
+func writeGroupLine(b *strings.Builder, depth, level int, name string, occurs int) {
+	line := fmt.Sprintf("%s%02d  %s", indent(depth), level, name)
+	if occurs > 0 {
+		line += fmt.Sprintf(" OCCURS %d TIMES", occurs)
+	}
+	fmt.Fprintf(b, "%s.\n", line)
 }
 
 // picColumn は PICTURE 句を揃える桁位置（ネストの深さによらず一定）。
 const picColumn = 40
 
-// writeLeafLine は基本項目／FILLER の行（PICTURE / USAGE / VALUE 句つき）を書き出す。
-func writeLeafLine(b *strings.Builder, depth, level int, f *cobol.Field) {
+// writeLeafLine は基本項目／FILLER の行（PICTURE / USAGE / OCCURS / VALUE 句つき）を書き出す。
+func writeLeafLine(b *strings.Builder, depth, level int, f *cobol.Field, occurs int) {
 	clause := "PIC " + f.Picture()
 	if f.Usage == cobol.UsagePacked {
 		clause += " PACKED-DECIMAL"
 	}
-	clause += " " + valueClause(f)
+	// OCCURS と VALUE は同時指定できないため、表項目は OCCURS のみ出力する。
+	if occurs > 0 {
+		clause += fmt.Sprintf(" OCCURS %d TIMES", occurs)
+	} else {
+		clause += " " + valueClause(f)
+	}
 
 	prefix := fmt.Sprintf("%s%02d  %s", indent(depth), level, f.DisplayName())
 	fmt.Fprintf(b, "%-*s %s.\n", picColumn, prefix, clause)
