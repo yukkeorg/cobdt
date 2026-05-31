@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, for example v1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION_FILE: go.mod
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GO_VERSION_FILE }}
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            package: tar.gz
+          - goos: linux
+            goarch: arm64
+            package: tar.gz
+          - goos: darwin
+            goarch: amd64
+            package: tar.gz
+          - goos: darwin
+            goarch: arm64
+            package: tar.gz
+          - goos: windows
+            goarch: amd64
+            package: zip
+          - goos: windows
+            goarch: arm64
+            package: zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GO_VERSION_FILE }}
+          cache: true
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+          binary="cdm"
+          if [ "${GOOS}" = "windows" ]; then
+            binary="${binary}.exe"
+          fi
+
+          go build -trimpath -ldflags="-s -w" -o "dist/${binary}" ./cmd/cdm
+
+          asset_dir="cdm_${RELEASE_TAG}_${GOOS}_${GOARCH}"
+          mkdir -p "dist/${asset_dir}"
+          cp "dist/${binary}" "dist/${asset_dir}/"
+
+          if [ "${{ matrix.package }}" = "zip" ]; then
+            (
+              cd dist
+              zip -r "${asset_dir}.zip" "${asset_dir}"
+            )
+          else
+            tar -C dist -czf "dist/${asset_dir}.tar.gz" "${asset_dir}"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdm-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          (
+            cd dist
+            sha256sum *.tar.gz *.zip > checksums.txt
+          )
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" dist/* --clobber
+          else
+            gh release create "${RELEASE_TAG}" dist/* \
+              --title "${RELEASE_TAG}" \
+              --generate-notes
+          fi

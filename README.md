@@ -35,6 +35,28 @@ go build -o cdm ./cmd/cdm
 go test ./...
 ```
 
+## リリース
+
+`v` で始まるタグを GitHub に push すると、GitHub Actions がテストとクロスビルドを実行し、
+GitHub Release を作成してビルド済みバイナリを添付します。
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+作成される成果物:
+
+- `cdm_<tag>_linux_amd64.tar.gz`
+- `cdm_<tag>_linux_arm64.tar.gz`
+- `cdm_<tag>_darwin_amd64.tar.gz`
+- `cdm_<tag>_darwin_arm64.tar.gz`
+- `cdm_<tag>_windows_amd64.zip`
+- `cdm_<tag>_windows_arm64.zip`
+- `checksums.txt`
+
+GitHub Actions の `Release` workflow を手動実行し、`tag` に既存タグ名を指定して発行することもできます。
+
 ## 使い方
 
 ```text
