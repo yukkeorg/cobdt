@@ -19,20 +19,9 @@ func Create(configPath, outputPath string, stdout io.Writer) error {
 		return err
 	}
 
-	records := make([][]byte, 0, len(spec.Rows))
-	for rowIdx, values := range spec.Rows {
-		if len(values) != len(spec.Fields) {
-			return fmt.Errorf("data[%d]: 値の数 %d が項目数 %d と一致しません", rowIdx, len(values), len(spec.Fields))
-		}
-		var rec []byte
-		for i, ff := range spec.Fields {
-			b, err := cobol.Encode(ff.Field, values[i])
-			if err != nil {
-				return fmt.Errorf("data[%d] %s: %w", rowIdx, ff.Name, err)
-			}
-			rec = append(rec, b...)
-		}
-		records = append(records, rec)
+	records, err := spec.BuildRecords()
+	if err != nil {
+		return err
 	}
 
 	if err := datafile.WriteRecords(outputPath, spec.Organization, records); err != nil {
@@ -64,19 +53,19 @@ func Dump(configPath, inputPath string, stdout io.Writer) error {
 
 	for idx, rec := range records {
 		fmt.Fprintf(stdout, "===== レコード %d =====\n", idx+1)
-		offset := 0
+		// Fields は再定義項目の葉を原定義と同じオフセットに重ねて並べる。各葉を
+		// 自分のオフセットで読み出すため、再定義領域は全解釈が並列に表示される。
 		for _, ff := range spec.Fields {
 			size := ff.Field.Size()
-			if offset+size > len(rec) {
+			if ff.Offset+size > len(rec) {
 				fmt.Fprintf(stdout, "  %-20s %-24s <レコード長不足>\n", ff.Name, ff.Field.TypeName())
-				break
+				continue
 			}
-			val, err := cobol.Decode(ff.Field, rec[offset:offset+size])
+			val, err := cobol.Decode(ff.Field, rec[ff.Offset:ff.Offset+size])
 			if err != nil {
 				return fmt.Errorf("レコード %d %s: %w", idx+1, ff.Name, err)
 			}
 			fmt.Fprintf(stdout, "  %-20s %-24s %s\n", ff.Name, ff.Field.TypeName(), val)
-			offset += size
 		}
 	}
 	return nil

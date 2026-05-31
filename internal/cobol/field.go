@@ -94,6 +94,7 @@ type Item struct {
 	Leaf     *Field  // 基本項目／FILLER（葉のとき非 nil）
 	Children []*Item // 集団項目の子項目
 	Occurs   int     // OCCURS 要素数。0 なら表ではない。
+	Redefine string  // REDEFINES の対象項目名（再定義項目のとき非空）。原定義と同じバイト領域に重なる。
 }
 
 // IsGroup は集団項目なら true を返す。
@@ -101,41 +102,112 @@ func (it *Item) IsGroup() bool { return it.Leaf == nil }
 
 // FlatField は record をフラット化した 1 つの基本項目。
 // 表項目（OCCURS）は要素ごとに展開され、Name に添字（"NAME(1)" など）が付く。
+// Offset はその葉がレコード先頭から占める位置（バイト）。再定義項目の葉は
+// 原定義の葉と同じ Offset に重なる。
 type FlatField struct {
-	Field *Field
-	Name  string
+	Field  *Field
+	Name   string
+	Offset int
 }
 
-// FlattenItems は record ツリーを葉項目の並びへ展開する。
-// OCCURS 指定された項目は要素数だけ繰り返し、各葉に添字付きの表示名を与える。
+// FlattenItems は record ツリーを葉項目の並びへ展開し、各葉にレコード先頭からの
+// オフセットを与える。OCCURS 指定された項目は要素数だけ繰り返す。再定義領域では
+// 原定義に続けて各再定義項目を同じオフセットに重ねて並べる（オフセットは前進しない）。
 // 集団項目自身は値を持たないため展開結果には含まれない。
 func FlattenItems(items []*Item) []FlatField {
 	var out []FlatField
-	flattenItems(items, nil, &out)
+	flattenItems(items, 0, nil, &out)
 	return out
 }
 
-func flattenItems(items []*Item, subs []int, out *[]FlatField) {
-	for _, it := range items {
-		if it.Occurs <= 0 {
-			flattenOne(it, subs, out)
-			continue
+// flattenItems は base から始まる items の葉を out に追加し、items の直後の
+// オフセットを返す。再定義領域の各メンバーは同じオフセットを共有する。
+func flattenItems(items []*Item, base int, subs []int, out *[]FlatField) int {
+	offset := base
+	for i := 0; i < len(items); {
+		j := i + 1
+		for j < len(items) && items[j].Redefine != "" {
+			j++
 		}
-		for i := 1; i <= it.Occurs; i++ {
-			flattenOne(it, appendInt(subs, i), out)
+		if j-i > 1 {
+			// 再定義領域: 全メンバーが同じオフセットから始まる
+			end := offset
+			for k := i; k < j; k++ {
+				if e := flattenOne(items[k], offset, subs, out); e > end {
+					end = e
+				}
+			}
+			offset = end
+		} else {
+			offset = flattenOne(items[i], offset, subs, out)
 		}
+		i = j
 	}
+	return offset
 }
 
-func flattenOne(it *Item, subs []int, out *[]FlatField) {
+// flattenOne は base から始まる 1 項目を展開し、その直後のオフセットを返す。
+func flattenOne(it *Item, base int, subs []int, out *[]FlatField) int {
+	if it.Occurs <= 0 {
+		return flattenOneAt(it, base, subs, out)
+	}
+	offset := base
+	for i := 1; i <= it.Occurs; i++ {
+		offset = flattenOneAt(it, offset, appendInt(subs, i), out)
+	}
+	return offset
+}
+
+func flattenOneAt(it *Item, base int, subs []int, out *[]FlatField) int {
 	if it.IsGroup() {
-		flattenItems(it.Children, subs, out)
-		return
+		return flattenItems(it.Children, base, subs, out)
 	}
 	*out = append(*out, FlatField{
-		Field: it.Leaf,
-		Name:  it.Leaf.DisplayName() + formatSubscripts(subs),
+		Field:  it.Leaf,
+		Name:   it.Leaf.DisplayName() + formatSubscripts(subs),
+		Offset: base,
 	})
+	return base + it.Leaf.Size()
+}
+
+// ItemSize は項目がファイル上で占めるバイト数を返す。集団項目は従属項目の
+// 合計（再定義の重なりは一度だけ数える）、OCCURS 指定があれば要素数倍。
+func ItemSize(it *Item) int {
+	var s int
+	if it.IsGroup() {
+		s = SiblingsSize(it.Children)
+	} else {
+		s = it.Leaf.Size()
+	}
+	if it.Occurs > 0 {
+		s *= it.Occurs
+	}
+	return s
+}
+
+// SiblingsSize は同じ階層に並ぶ項目群が占めるバイト数を返す。
+// 再定義領域は原定義と全再定義項目の最大サイズを一度だけ数える。
+func SiblingsSize(items []*Item) int {
+	offset := 0
+	for i := 0; i < len(items); {
+		j := i + 1
+		for j < len(items) && items[j].Redefine != "" {
+			j++
+		}
+		if j-i > 1 {
+			end := offset
+			for k := i; k < j; k++ {
+				if e := offset + ItemSize(items[k]); e > end {
+					end = e
+				}
+			}
+			offset = end
+		} else {
+			offset += ItemSize(items[i])
+		}
+		i = j
+	}
+	return offset
 }
 
 // appendInt は s を変更せずに v を追加した新しいスライスを返す。
@@ -203,10 +275,14 @@ func (f *Field) TypeName() string {
 }
 
 // RecordLength はフラット化した項目群が構成する固定長レコードのバイト数を返す。
+// 再定義項目の葉は原定義と同じオフセットに重なるため、各葉の終端（Offset+Size）の
+// 最大値をレコード長とする（重なりを二重に数えない）。
 func RecordLength(fields []FlatField) int {
-	total := 0
+	max := 0
 	for _, ff := range fields {
-		total += ff.Field.Size()
+		if end := ff.Offset + ff.Field.Size(); end > max {
+			max = end
+		}
 	}
-	return total
+	return max
 }

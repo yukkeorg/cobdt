@@ -128,8 +128,8 @@ data:
 
 各項目は `type` を持ちます。`type: GROUP` なら集団項目、それ以外は基本項目／FILLER です。
 
-- **集団項目**: `type: GROUP`、`name`（必須）、`subs`（従属項目のリスト。必須）。`occurs` は任意。`usage`・`value` は持たない。
-- **基本項目**: `type`（必須）・`name`（必須）・`usage`・`value`・`occurs` を指定する。
+- **集団項目**: `type: GROUP`、`name`（必須）、`subs`（従属項目のリスト。必須）。`occurs`・`redefine` は任意。`usage`・`value` は持たない。
+- **基本項目**: `type`（必須）・`name`（必須）・`usage`・`value`・`occurs`・`redefine` を指定する。
 - **FILLER**: 無名項目。`type: FILLER(桁数)` で指定し、型は X として扱う。
 
 #### データ型（type）
@@ -156,6 +156,18 @@ data:
 
 ダンプ表示では各要素を `NAME(1)`, `NAME(2)` のように添字付きで表示します。
 
+#### 再定義（redefine）
+
+`redefine` に対象の項目名を指定すると、その項目（再定義項目）は対象（原定義）と**同じバイト領域**を別の意味で解釈します。領域は増えず、解釈だけが増えます。レコード種別によって後続の意味が変わるレイアウトに使います。基本項目・集団項目のどちらにも指定できます。
+
+- 再定義項目は対象と同じ階層の兄弟で、対象の直後（または同じ対象を指す別の再定義項目の直後）に置きます。対象名は前方の同階層項目として解決します（大文字小文字は区別しない）。
+- 原定義と各再定義項目は**同一バイト数**でなければなりません（揃わない場合は FILLER でパディング）。
+- 同じ対象を複数の再定義項目が指せます。`redefine` と `occurs` は併用できません。
+- ダンプ表示では同じバイトを原定義・各再定義項目の両方の解釈でラベル付きに並べて表示します（レコード種別による自動選択はしません）。
+- コピーブックでは対象と同じレベル番号で `REDEFINES 対象名` を出力します。
+
+`data` での値の与え方は [データ](#データdata) を参照してください。
+
 #### 内部格納形式（usage）
 
 数値項目（`9`）のみ指定でき、未指定なら `DISPLAY` です。
@@ -179,6 +191,39 @@ data:
 値は `record` の構造をフラット化した順に並べます（集団項目自体の値は指定しません）。
 
 値に `ZERO`（または `ZEROS`・`ZEROES`）・`SPACE`（または `SPACES`）が単独で指定された場合は、COBOL の表意定数として扱い、項目全体をゼロ／空白で埋めます。
+
+#### 再定義領域の値（redefine）
+
+再定義領域（原定義とそれを指す再定義項目群）は、`data` 行で常に **1 スロット**を占めます。レコードごとに、その領域をどの定義で埋めるかを選びます。
+
+- **原定義を使う**: 値をネストリスト（単一基本項目ならスカラ）で与える。
+- **再定義項目を使う**: `{target: 対象項目名, value: 値}` のマップで与える。`value` は対象が集団項目ならネストリスト、基本項目ならスカラ。
+
+1 行・1 領域につき書ける解釈は 1 つだけです。
+
+```yaml
+record:
+    - type: 9(2)
+      name: REC-TYPE
+    - type: GROUP            # 原定義（13 バイト）
+      name: BODY-PERSON
+      subs:
+        - { type: X(10), name: PERSON-NAME }
+        - { type: 9(3),  name: PERSON-AGE }
+    - type: GROUP            # BODY-PERSON を再定義（13 バイト）
+      name: BODY-COMPANY
+      redefine: BODY-PERSON
+      subs:
+        - { type: 9(7), name: COMP-ID }
+        - { type: X(6), name: COMP-CODE }
+    - type: X(3)
+      name: TRAILER
+data:
+    # 種別 01: 原定義 BODY-PERSON を使う
+    - [01, ["ALICE", 30], "END"]
+    # 種別 02: BODY-COMPANY で再定義
+    - [02, {target: BODY-COMPANY, value: [1234567, "ABCDEF"]}, "END"]
+```
 
 ### 設定例
 
@@ -208,6 +253,21 @@ data:
     # MONTHLY-SALES は要素ごとのネストリストで指定する
     - [123, John Smith, 山田太郎, 1234567.89, [10.5, 20.0, 30.25], "***"]
     - [7, Alice, 鈴木花子, -42.5, [0, 1.5, 2], "---"]
+```
+
+## サンプル
+
+`extra/` に設定 YAML のサンプルがあります。
+
+| ファイル | 内容 |
+| --- | --- |
+| `extra/example.yaml` | 集団項目・表項目（OCCURS）・FILLER を含む基本的な例 |
+| `extra/redefine_example.yaml` | 再定義（REDEFINES）の例。レコード種別で後続の意味が変わるレイアウト |
+
+```sh
+cdm create-copybook extra/redefine_example.yaml
+cdm create          extra/redefine_example.yaml output.dat
+cdm dump            extra/redefine_example.yaml output.dat
 ```
 
 ## ライセンス

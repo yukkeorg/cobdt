@@ -1,0 +1,35 @@
+# 再定義（REDEFINES）のサンプル。
+# 先頭の REC-TYPE（レコード種別）によって後続の意味が変わるレイアウトを表す。
+#   種別 01 → BODY-PERSON（人物情報）として解釈
+#   種別 02 → BODY-COMPANY（会社情報）として解釈
+# BODY-COMPANY は BODY-PERSON を再定義し、同じ 13 バイト領域に重なる。
+name: TXN-RECORD
+organization: line sequential
+n-encode: sjis
+record:
+    - type: 9(2)
+      name: REC-TYPE
+    # 原定義（10 + 3 = 13 バイト）
+    - type: GROUP
+      name: BODY-PERSON
+      subs:
+        - type: X(10)
+          name: PERSON-NAME
+        - type: 9(3)
+          name: PERSON-AGE
+    # BODY-PERSON を再定義（7 + 6 = 13 バイト。原定義と同一サイズ）
+    - type: GROUP
+      name: BODY-COMPANY
+      redefine: BODY-PERSON
+      subs:
+        - type: 9(7)
+          name: COMP-ID
+        - type: X(6)
+          name: COMP-CODE
+    - type: X(3)
+      name: TRAILER
+data:
+    # 種別 01: 原定義 BODY-PERSON を使う（値はネストリスト）
+    - [01, ["ALICE", 30], "END"]
+    # 種別 02: BODY-COMPANY で再定義（target で対象を選び、value で値を与える）
+    - [02, {target: BODY-COMPANY, value: [1234567, "ABCDEF"]}, "END"]

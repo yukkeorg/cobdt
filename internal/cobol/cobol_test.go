@@ -130,6 +130,61 @@ func TestFlattenItems(t *testing.T) {
 	}
 }
 
+func TestRedefineLayout(t *testing.T) {
+	mk := func(name, def string) *Field {
+		f, err := ParseField(name, def)
+		if err != nil {
+			t.Fatalf("ParseField(%q): %v", def, err)
+		}
+		return f
+	}
+	// REC-TYPE 9(2), BODY-PERSON {X(10),9(3)}, BODY-COMPANY REDEFINES BODY-PERSON {9(7),X(6)}, TRAILER X(3)
+	items := []*Item{
+		{Leaf: mk("REC-TYPE", "9(2)")},
+		{Group: "BODY-PERSON", Children: []*Item{
+			{Leaf: mk("PERSON-NAME", "X(10)")},
+			{Leaf: mk("PERSON-AGE", "9(3)")},
+		}},
+		{Group: "BODY-COMPANY", Redefine: "BODY-PERSON", Children: []*Item{
+			{Leaf: mk("COMP-ID", "9(7)")},
+			{Leaf: mk("COMP-CODE", "X(6)")},
+		}},
+		{Leaf: mk("TRAILER", "X(3)")},
+	}
+
+	if got, want := ItemSize(items[1]), ItemSize(items[2]); got != want {
+		t.Errorf("ItemSize(BODY-PERSON)=%d, ItemSize(BODY-COMPANY)=%d, want equal", got, want)
+	}
+
+	fields := fieldsByName(FlattenItems(items))
+	wantOffsets := map[string]int{
+		"REC-TYPE": 0, "PERSON-NAME": 2, "PERSON-AGE": 12,
+		"COMP-ID": 2, "COMP-CODE": 9, "TRAILER": 15,
+	}
+	for name, off := range wantOffsets {
+		ff, ok := fields[name]
+		if !ok {
+			t.Fatalf("flat field %q not found", name)
+		}
+		if ff.Offset != off {
+			t.Errorf("%s offset = %d, want %d", name, ff.Offset, off)
+		}
+	}
+
+	if got := RecordLength(FlattenItems(items)); got != 18 {
+		t.Errorf("RecordLength = %d, want 18 (REC-TYPE 2 + area 13 + TRAILER 3)", got)
+	}
+}
+
+// fieldsByName は名前→FlatField の対応表を作るテスト補助。
+func fieldsByName(fields []FlatField) map[string]FlatField {
+	m := make(map[string]FlatField, len(fields))
+	for _, ff := range fields {
+		m[ff.Name] = ff
+	}
+	return m
+}
+
 func TestEncodeFigurative(t *testing.T) {
 	fx, _ := ParseField("F", "X(3)")
 	fn, _ := ParseField("F", "9(3)")

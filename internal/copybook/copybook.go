@@ -16,7 +16,7 @@ func Generate(recordName string, items []*cobol.Item) string {
 		recordName = "DATA-RECORD"
 	}
 	var b strings.Builder
-	writeGroupLine(&b, 0, 1, recordName, 0)
+	writeGroupLine(&b, 0, 1, recordName, 0, "")
 	writeItems(&b, items, 1)
 	return b.String()
 }
@@ -26,17 +26,20 @@ func writeItems(b *strings.Builder, items []*cobol.Item, depth int) {
 	level := 2*depth + 1
 	for _, it := range items {
 		if it.IsGroup() {
-			writeGroupLine(b, depth, level, it.Group, it.Occurs)
+			writeGroupLine(b, depth, level, it.Group, it.Occurs, it.Redefine)
 			writeItems(b, it.Children, depth+1)
 		} else {
-			writeLeafLine(b, depth, level, it.Leaf, it.Occurs)
+			writeLeafLine(b, depth, level, it.Leaf, it.Occurs, it.Redefine)
 		}
 	}
 }
 
 // writeGroupLine は集団項目／レコード名の行（PICTURE 句なし）を書き出す。
-func writeGroupLine(b *strings.Builder, depth, level int, name string, occurs int) {
+func writeGroupLine(b *strings.Builder, depth, level int, name string, occurs int, redefine string) {
 	line := fmt.Sprintf("%s%02d  %s", indent(depth), level, name)
+	if redefine != "" {
+		line += " REDEFINES " + redefine
+	}
 	if occurs > 0 {
 		line += fmt.Sprintf(" OCCURS %d TIMES", occurs)
 	}
@@ -46,8 +49,8 @@ func writeGroupLine(b *strings.Builder, depth, level int, name string, occurs in
 // picColumn は PICTURE 句を揃える桁位置（ネストの深さによらず一定）。
 const picColumn = 40
 
-// writeLeafLine は基本項目／FILLER の行（PICTURE / USAGE / OCCURS / VALUE 句つき）を書き出す。
-func writeLeafLine(b *strings.Builder, depth, level int, f *cobol.Field, occurs int) {
+// writeLeafLine は基本項目／FILLER の行（REDEFINES / PICTURE / USAGE / OCCURS / VALUE 句つき）を書き出す。
+func writeLeafLine(b *strings.Builder, depth, level int, f *cobol.Field, occurs int, redefine string) {
 	clause := "PIC " + f.Picture()
 	if f.Usage == cobol.UsagePacked {
 		clause += " PACKED-DECIMAL"
@@ -60,6 +63,9 @@ func writeLeafLine(b *strings.Builder, depth, level int, f *cobol.Field, occurs 
 	}
 
 	prefix := fmt.Sprintf("%s%02d  %s", indent(depth), level, f.DisplayName())
+	if redefine != "" {
+		prefix += " REDEFINES " + redefine
+	}
 	fmt.Fprintf(b, "%-*s %s.\n", picColumn, prefix, clause)
 }
 
