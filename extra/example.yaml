@@ -2,8 +2,10 @@ name: EMP-RECORD
 organization: sequential
 n-encode: sjis
 record:
-    # 集団項目（EMP）配下に基本項目をネストできる
-    - EMP:
+    # 集団項目（type: GROUP, name, subs）
+    - type: GROUP
+      name: EMP
+      subs:
         - type: 9(5)
           name: EMP-ID
           value: 0
@@ -14,11 +16,13 @@ record:
     - type: S9(7)V99
       name: SALARY
       usage: COMP-3
-    - type: S9(1)V99
-      name: BONUS-RATE
+    # 表項目（occurs）。基本項目を繰り返す。
+    - type: S9(3)V99
+      name: MONTHLY-SALES
+      occurs: 3
     # 無名の FILLER 項目（型は X）。値はデータ行で指定する。
     - type: FILLER(3)
 data:
-    # 値は record をフラット化した順に並べる（集団項目の値は持たない）
-    - [123, John Smith, 山田太郎, 1234567.89, -1.25, "***"]
-    - [7, Alice, 鈴木花子, -42.5, 0.5, "---"]
+    # MONTHLY-SALES は要素ごとのネストリストで指定する
+    - [123, John Smith, 山田太郎, 1234567.89, [10.5, 20.0, 30.25], "***"]
+    - [7, Alice, 鈴木花子, -42.5, [0, 1.5, 2], "---"]
