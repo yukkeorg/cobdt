@@ -91,7 +91,7 @@ func encodeZoned(digits string, negative, signed bool) []byte {
 	b := []byte(digits) // ASCII '0'-'9'
 	if signed && negative && len(b) > 0 {
 		d := b[len(b)-1] - '0'
-		b[len(b)-1] = 0x70 + d
+		b[len(b)-1] = zoneOverpunchNegBase + d
 	}
 	return b
 }
@@ -109,11 +109,11 @@ func encodePacked(digits string, negative, signed bool) []byte {
 	}
 	switch {
 	case !signed:
-		nibbles[totalNibbles-1] = 0x0F
+		nibbles[totalNibbles-1] = packSignUnsigned
 	case negative:
-		nibbles[totalNibbles-1] = 0x0D
+		nibbles[totalNibbles-1] = packSignNegative
 	default:
-		nibbles[totalNibbles-1] = 0x0C
+		nibbles[totalNibbles-1] = packSignPositive
 	}
 
 	buf := make([]byte, nBytes)
@@ -146,7 +146,7 @@ func encodeJapanese(value string, length int, enc NEncoding) ([]byte, error) {
 		return sjis[:target], nil
 	}
 	for len(sjis) < target {
-		sjis = append(sjis, 0x81, 0x40) // 全角空白
+		sjis = append(sjis, sjisFullWidthSpace...)
 	}
 	return sjis[:target], nil
 }

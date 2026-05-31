@@ -62,8 +62,8 @@ func ParseField(name, def string) (*Field, error) {
 		if total == 0 {
 			return nil, fmt.Errorf("項目 %s: 数値項目の桁数が 0 です: %q", name, def)
 		}
-		if total > 31 {
-			return nil, fmt.Errorf("項目 %s: 数値項目の桁数は最大 31 桁です（指定: %d 桁）", name, total)
+		if total > maxNumericDigits {
+			return nil, fmt.Errorf("項目 %s: 数値項目の桁数は最大 %d 桁です（指定: %d 桁）", name, maxNumericDigits, total)
 		}
 	case 'X':
 		f.Type = TypeAlphanumeric

@@ -168,8 +168,7 @@ func itemName(it *cobol.Item) string {
 // 原定義または別の再定義項目を対象として参照し、原定義と同一バイト数でなければ
 // ならない。FILLER への redefine、occurs との併用、occurs 項目の対象化は禁止する。
 func validateRedefines(items []*cobol.Item) error {
-	i := 0
-	for i < len(items) {
+	for i := 0; i < len(items); {
 		orig := items[i]
 		if orig.Redefine != "" {
 			return fmt.Errorf("再定義項目 %s: 対象 %s が同じ階層の直前に見つかりません", itemName(orig), orig.Redefine)

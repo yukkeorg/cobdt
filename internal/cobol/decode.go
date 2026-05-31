@@ -42,11 +42,11 @@ func decodeZoned(b []byte) (digits string, negative bool) {
 		switch {
 		case c >= '0' && c <= '9':
 			out[i] = c
-		case c >= 0x70 && c <= 0x79: // 負のオーバーパンチ
-			out[i] = '0' + (c - 0x70)
+		case c >= zoneOverpunchNegBase && c <= zoneOverpunchNegMax: // 負のオーバーパンチ
+			out[i] = '0' + (c - zoneOverpunchNegBase)
 			negative = true
-		case c >= 0x40 && c <= 0x49: // 正のオーバーパンチ（別実装互換）
-			out[i] = '0' + (c - 0x40)
+		case c >= zoneOverpunchPosBase && c <= zoneOverpunchPosMax: // 正のオーバーパンチ（別実装互換）
+			out[i] = '0' + (c - zoneOverpunchPosBase)
 		default:
 			out[i] = '0'
 		}
@@ -68,7 +68,7 @@ func decodePacked(b []byte) (digits string, negative bool) {
 	for _, n := range nibbles[:len(nibbles)-1] {
 		sb.WriteByte('0' + n)
 	}
-	negative = sign == 0x0D || sign == 0x0B
+	negative = sign == packSignNegative || sign == packSignNegativeAlt
 	return sb.String(), negative
 }
 
