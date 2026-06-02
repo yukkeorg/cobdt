@@ -461,8 +461,23 @@ func encodeOnce(it *cobol.Item, node *yaml.Node) ([]byte, error) {
 	return encodeLeaf(it.Leaf, node)
 }
 
-// encodeLeaf は基本項目／FILLER をスカラ値ノードからエンコードする。
+// encodeLeaf は基本項目／FILLER を値ノードからエンコードする。値はスカラ、または
+// 生バイト書き込みを表す {raw: "..."} マップ（数値 DISPLAY 項目のみ）を受け付ける。
 func encodeLeaf(f *cobol.Field, node *yaml.Node) ([]byte, error) {
+	if node.Kind == yaml.MappingNode {
+		m := nodeMap(node)
+		rn, ok := m["raw"]
+		if !ok {
+			return nil, fmt.Errorf("項目 %s: 値のマップには raw が必要です", f.DisplayName())
+		}
+		if len(m) != 1 {
+			return nil, fmt.Errorf("項目 %s: raw マップに他のキーは指定できません", f.DisplayName())
+		}
+		if rn.Kind != yaml.ScalarNode {
+			return nil, fmt.Errorf("項目 %s: raw の値はスカラで指定してください", f.DisplayName())
+		}
+		return cobol.EncodeRaw(f, rn.Value)
+	}
 	if node.Kind != yaml.ScalarNode {
 		return nil, fmt.Errorf("項目 %s: 値はスカラで指定してください", f.DisplayName())
 	}

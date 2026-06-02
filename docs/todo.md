@@ -8,6 +8,7 @@
 - [x] REDEFINES 句への対応
 - [x] コピーブック取り込みモード（import-copybook）
 - [x] 表意定数 LOW-VALUE / HIGH-VALUE への対応
+- [x] data の raw セル（数値項目への生バイト書き込み）
 
 ## 未着手
 
@@ -21,6 +22,6 @@
 
 - import-copybook が受け付けない構文（COMP/BINARY、編集用 PICTURE、SYNC、OCCURS DEPENDING ON、
   66/77 レベルなど）。`docs/adr/0002-import-copybook-strict-subset.md` 参照。
-- 同一エントリでの OCCURS と REDEFINES の併用。COBOL 仕様で違法のためエラーとする
+- 同一エントリでの OCCURS と REDEFINES の併用。COBOL 仕様で適合しないためエラーとする
   （再定義グループの従属項目に OCCURS を付けるのは合法で、対応済み）。
   `docs/adr/0001-redefines-overlapping-area.md` 参照。

@@ -26,6 +26,22 @@ func Encode(f *Field, value string) ([]byte, error) {
 	return nil, fmt.Errorf("項目 %s: 未対応の型です", f.Name)
 }
 
+// EncodeRaw は value を sanitize（非数字除去）も表意定数解釈もせず、そのままバイト列として
+// 数値項目へ書き込む。COBOL プログラムの不正データ耐性テスト用に、数値項目へ意図的に
+// 非数値バイトを注入する目的で使う。ゾーン10進数（DISPLAY）の数値項目のみに指定でき、
+// バイト長は項目のバイト長と正確に一致しなければならない（固定長レコードを崩さないため）。
+func EncodeRaw(f *Field, value string) ([]byte, error) {
+	if f.Type != TypeNumeric || f.Usage != UsageDisplay {
+		return nil, fmt.Errorf("項目 %s: raw は数値(DISPLAY)項目にのみ指定できます", f.DisplayName())
+	}
+	b := []byte(value)
+	if len(b) != f.Size() {
+		return nil, fmt.Errorf("項目 %s: raw のバイト長 %d が項目のバイト長 %d と一致しません",
+			f.DisplayName(), len(b), f.Size())
+	}
+	return b, nil
+}
+
 // encodeFigurative は表意定数を項目定義に従ったバイト列へ変換する。
 // ZERO は項目をゼロ、SPACE は空白で埋める（型に応じた文字埋め）。
 // LOW-VALUE / HIGH-VALUE は型に関係なくバイト長ぶんを 0x00 / 0xFF で埋める（バイト埋め）。

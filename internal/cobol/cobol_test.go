@@ -269,6 +269,41 @@ func TestDecodeFigurative(t *testing.T) {
 	}
 }
 
+func TestEncodeRaw(t *testing.T) {
+	f9, _ := ParseField("N", "9(5)")        // 5 バイト
+	fsv, _ := ParseField("N", "S9(3)V99")   // 5 バイト（符号はオーバーパンチ、小数点はなし）
+	fp, _ := ParseField("N", "9(5) COMP-3") // パック10進数
+	fx, _ := ParseField("N", "X(5)")
+
+	// 正常: sanitize も表意定数解釈もせず、そのままバイト列になる。
+	for _, v := range []string{"AB1CD", "ZERO ", "12.45"} {
+		got, err := EncodeRaw(f9, v)
+		if err != nil {
+			t.Fatalf("EncodeRaw(9(5), %q): %v", v, err)
+		}
+		if !bytes.Equal(got, []byte(v)) {
+			t.Errorf("EncodeRaw(9(5), %q) = % x, want % x", v, got, []byte(v))
+		}
+	}
+	// 符号・小数を持つ数値項目もバイト長（5）に一致すれば書ける。
+	if _, err := EncodeRaw(fsv, "ABCDE"); err != nil {
+		t.Errorf("EncodeRaw(S9(3)V99, \"ABCDE\"): %v", err)
+	}
+
+	// エラー: 長さ不一致。
+	if _, err := EncodeRaw(f9, "AB"); err == nil {
+		t.Error("EncodeRaw 長さ不一致はエラーになるべきです")
+	}
+	// エラー: DISPLAY 以外（packed）。
+	if _, err := EncodeRaw(fp, "ABC"); err == nil {
+		t.Error("EncodeRaw(packed) はエラーになるべきです")
+	}
+	// エラー: 数値以外（X）。
+	if _, err := EncodeRaw(fx, "ABCDE"); err == nil {
+		t.Error("EncodeRaw(X) はエラーになるべきです")
+	}
+}
+
 func TestEncodeZonedOverpunch(t *testing.T) {
 	f, _ := ParseField("F", "S9(3)")
 	enc, _ := Encode(f, "-1")
