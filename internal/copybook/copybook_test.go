@@ -169,6 +169,33 @@ func TestRenderOmitsDefaultValue(t *testing.T) {
 	}
 }
 
+func TestParseFigurativeValue(t *testing.T) {
+	src := `       01  REC.
+           03  A   PIC X(4) VALUE HIGH-VALUE.
+           03  B   PIC 9(3) VALUE LOW-VALUES.
+`
+	_, items, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if items[0].Leaf.Value != "HIGH-VALUE" {
+		t.Errorf("items[0].Value = %q, want HIGH-VALUE", items[0].Leaf.Value)
+	}
+	// 複数形 LOW-VALUES もそのまま保持する（FigurativeConstant が正規化する）。
+	if items[1].Leaf.Value != "LOW-VALUES" {
+		t.Errorf("items[1].Value = %q, want LOW-VALUES", items[1].Leaf.Value)
+	}
+
+	// LOW-VALUE / HIGH-VALUE は既定値ではないため value として出力される。
+	out, err := RenderYAML("REC", items)
+	if err != nil {
+		t.Fatalf("RenderYAML: %v", err)
+	}
+	if !strings.Contains(string(out), "value: HIGH-VALUE") {
+		t.Errorf("value: HIGH-VALUE が出力されていません:\n%s", out)
+	}
+}
+
 // TestRoundTripThroughConfig は生成 YAML が config.Load で読み込め、コピーブックの
 // レイアウトを保つことを検証する（コピーブック → YAML → Spec の往復）。
 func TestRoundTripThroughConfig(t *testing.T) {

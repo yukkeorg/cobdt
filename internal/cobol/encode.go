@@ -26,10 +26,15 @@ func Encode(f *Field, value string) ([]byte, error) {
 	return nil, fmt.Errorf("項目 %s: 未対応の型です", f.Name)
 }
 
-// encodeFigurative は表意定数（ZERO / SPACE）を項目定義に従ったバイト列へ変換する。
-// ZERO は項目をゼロで、SPACE は空白で全桁埋める。
+// encodeFigurative は表意定数を項目定義に従ったバイト列へ変換する。
+// ZERO は項目をゼロ、SPACE は空白で埋める（型に応じた文字埋め）。
+// LOW-VALUE / HIGH-VALUE は型に関係なくバイト長ぶんを 0x00 / 0xFF で埋める（バイト埋め）。
 func encodeFigurative(f *Field, fig string) ([]byte, error) {
 	switch fig {
+	case "LOW-VALUE":
+		return bytes.Repeat([]byte{0x00}, f.Size()), nil
+	case "HIGH-VALUE":
+		return bytes.Repeat([]byte{0xFF}, f.Size()), nil
 	case "ZERO":
 		switch f.Type {
 		case TypeNumeric:

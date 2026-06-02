@@ -276,10 +276,10 @@ func parseEntry(st stmt) (*entry, error) {
 			val, quoted := unquote(toks[i])
 			if !quoted {
 				switch strings.ToUpper(val) {
-				case "ZERO", "ZEROS", "ZEROES", "SPACE", "SPACES":
+				case "ZERO", "ZEROS", "ZEROES", "SPACE", "SPACES",
+					"LOW-VALUE", "LOW-VALUES", "HIGH-VALUE", "HIGH-VALUES":
 					// cdm が対応する表意定数
-				case "HIGH-VALUE", "HIGH-VALUES", "LOW-VALUE", "LOW-VALUES",
-					"QUOTE", "QUOTES", "NULL", "NULLS":
+				case "QUOTE", "QUOTES", "NULL", "NULLS":
 					return nil, fmt.Errorf("%d 行目: 未対応の表意定数です: %s", st.line, val)
 				}
 			}

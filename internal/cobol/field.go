@@ -46,14 +46,20 @@ func ParseNEncoding(s string) (NEncoding, error) {
 	}
 }
 
-// FigurativeConstant は値が COBOL の表意定数（ZERO / SPACE / SPACES）として
-// 単独で現れているかを判定し、正規化した名称（"ZERO" または "SPACE"）と true を返す。
+// FigurativeConstant は値が COBOL の表意定数として単独で現れているかを判定し、
+// 正規化した名称（"ZERO" / "SPACE" / "LOW-VALUE" / "HIGH-VALUE"）と true を返す。
+// ZERO・SPACE は型に応じた文字で埋める「文字埋め」、LOW-VALUE・HIGH-VALUE は型に
+// 関係なく項目のバイト長ぶんを同一バイト（0x00 / 0xFF）で埋める「バイト埋め」。
 func FigurativeConstant(value string) (string, bool) {
 	switch strings.ToUpper(strings.TrimSpace(value)) {
 	case "ZERO", "ZEROS", "ZEROES":
 		return "ZERO", true
 	case "SPACE", "SPACES":
 		return "SPACE", true
+	case "LOW-VALUE", "LOW-VALUES":
+		return "LOW-VALUE", true
+	case "HIGH-VALUE", "HIGH-VALUES":
+		return "HIGH-VALUE", true
 	}
 	return "", false
 }

@@ -6,7 +6,18 @@ import (
 )
 
 // Decode は項目定義 f に従ってバイト列 b を表示用の値文字列へ変換する。
+// 全バイトが 0x00 / 0xFF のときは、バイト埋めの表意定数 LOW-VALUE / HIGH-VALUE と
+// みなしてラベル表示する（型に従った復号より優先する）。正規のゼロは 0x30、パック10進数の
+// ゼロは符号ニブルが非ゼロのため、全 0x00 と衝突しない。
 func Decode(f *Field, b []byte) (string, error) {
+	if len(b) > 0 {
+		if allBytes(b, 0x00) {
+			return "LOW-VALUE", nil
+		}
+		if allBytes(b, 0xFF) {
+			return "HIGH-VALUE", nil
+		}
+	}
 	switch f.Type {
 	case TypeNumeric:
 		var digits string
@@ -33,6 +44,16 @@ func Decode(f *Field, b []byte) (string, error) {
 		return strings.TrimRight(s, "　 "), nil
 	}
 	return "", fmt.Errorf("項目 %s: 未対応の型です", f.Name)
+}
+
+// allBytes は b の全要素が v と等しいかを返す。
+func allBytes(b []byte, v byte) bool {
+	for _, c := range b {
+		if c != v {
+			return false
+		}
+	}
+	return true
 }
 
 // decodeZoned はゾーン10進数を桁文字列と符号に分解する。

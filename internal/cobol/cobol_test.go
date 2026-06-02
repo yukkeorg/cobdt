@@ -189,6 +189,7 @@ func TestEncodeFigurative(t *testing.T) {
 	fx, _ := ParseField("F", "X(3)")
 	fn, _ := ParseField("F", "9(3)")
 	fnat, _ := ParseField("F", "N(2)")
+	fp, _ := ParseField("F", "S9(5) COMP-3") // パック10進数: 3 バイト
 
 	cases := []struct {
 		field *Field
@@ -204,6 +205,15 @@ func TestEncodeFigurative(t *testing.T) {
 		{fn, "ZEROES", []byte("000")},
 		{fnat, "SPACE", []byte{0x81, 0x40, 0x81, 0x40}}, // 全角空白
 		{fnat, "ZERO", []byte{0x82, 0x4f, 0x82, 0x4f}},  // 全角ゼロ
+		// LOW-VALUE / HIGH-VALUE は型に関係なくバイト長ぶんを 0x00 / 0xFF で埋める。
+		{fx, "LOW-VALUE", []byte{0x00, 0x00, 0x00}},
+		{fx, "HIGH-VALUE", []byte{0xff, 0xff, 0xff}},
+		{fx, "LOW-VALUES", []byte{0x00, 0x00, 0x00}},  // 複数形の別名
+		{fx, "HIGH-VALUES", []byte{0xff, 0xff, 0xff}}, // 複数形の別名
+		{fn, "LOW-VALUE", []byte{0x00, 0x00, 0x00}},
+		{fnat, "HIGH-VALUE", []byte{0xff, 0xff, 0xff, 0xff}}, // N(2) = 4 バイト
+		{fp, "LOW-VALUE", []byte{0x00, 0x00, 0x00}},          // パック10進数も 3 バイト
+		{fp, "HIGH-VALUE", []byte{0xff, 0xff, 0xff}},
 	}
 	for _, c := range cases {
 		got, err := Encode(c.field, c.value)
@@ -212,6 +222,49 @@ func TestEncodeFigurative(t *testing.T) {
 		}
 		if !bytes.Equal(got, c.want) {
 			t.Errorf("Encode(%s, %q) = % x, want % x", c.field.Raw, c.value, got, c.want)
+		}
+	}
+}
+
+func TestDecodeFigurative(t *testing.T) {
+	fx, _ := ParseField("F", "X(3)")
+	fn, _ := ParseField("F", "9(3)")
+	fnat, _ := ParseField("F", "N(2)")
+
+	// 全バイトが 0x00 / 0xFF なら型に関係なく LOW-VALUE / HIGH-VALUE と表示する。
+	labelCases := []struct {
+		field *Field
+		bytes []byte
+		want  string
+	}{
+		{fx, []byte{0x00, 0x00, 0x00}, "LOW-VALUE"},
+		{fx, []byte{0xff, 0xff, 0xff}, "HIGH-VALUE"},
+		{fn, []byte{0x00, 0x00, 0x00}, "LOW-VALUE"},
+		{fnat, []byte{0xff, 0xff, 0xff, 0xff}, "HIGH-VALUE"}, // N の 0xFF は Shift-JIS 変換できないが、ラベルで回避
+	}
+	for _, c := range labelCases {
+		got, err := Decode(c.field, c.bytes)
+		if err != nil {
+			t.Fatalf("Decode(% x): %v", c.bytes, err)
+		}
+		if got != c.want {
+			t.Errorf("Decode(%s, % x) = %q, want %q", c.field.Raw, c.bytes, got, c.want)
+		}
+	}
+
+	// 正規のゼロ（0x30）は LOW-VALUE と誤検出されない。
+	if got, _ := Decode(fn, []byte("000")); got == "LOW-VALUE" {
+		t.Errorf("正規のゼロが LOW-VALUE と誤判定されました: %q", got)
+	}
+
+	// encode → decode の往復で表意定数名が保たれる。
+	for _, name := range []string{"LOW-VALUE", "HIGH-VALUE"} {
+		b, err := Encode(fnat, name)
+		if err != nil {
+			t.Fatalf("Encode(%q): %v", name, err)
+		}
+		if got, _ := Decode(fnat, b); got != name {
+			t.Errorf("往復 %q = %q", name, got)
 		}
 	}
 }
