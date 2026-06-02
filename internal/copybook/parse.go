@@ -16,23 +16,9 @@ import (
 // best-effort 変換やスキップをせず、行と項目を示してエラーを返す
 // （docs/adr/0002-import-copybook-strict-subset.md 参照）。
 func Parse(src []byte) (name string, items []*cobol.Item, err error) {
-	stmts, err := scanStatements(string(src))
+	entries, err := scanEntries(src)
 	if err != nil {
 		return "", nil, err
-	}
-
-	var entries []*entry
-	for _, st := range stmts {
-		e, err := parseEntry(st)
-		if err != nil {
-			return "", nil, err
-		}
-		if e != nil { // nil は 88 レベルなど読み飛ばす項目
-			entries = append(entries, e)
-		}
-	}
-	if len(entries) == 0 {
-		return "", nil, fmt.Errorf("コピーブックに項目がありません")
 	}
 
 	first := entries[0]
@@ -63,6 +49,59 @@ func Parse(src []byte) (name string, items []*cobol.Item, err error) {
 	}
 
 	return first.name, items, nil
+}
+
+// ParseFragment は 01 レベルのレコード行を持たないコピーブック断片を解析し、
+// record の木構造を返す（docs/CONTEXT.md「コピーブック断片」参照）。断片は 01 を
+// 含まないことが前提のため、01 レベルが一つでも現れたらエラーとする（--fragment 指定と
+// 現物の矛盾。先頭欠落・途中切れのコピーブックを黙って断片扱いしないための fail-loud 検査）。
+// 先頭エントリのレベルを最上位とみなし、それと同一レベルの項目群を record とする。
+func ParseFragment(src []byte) (items []*cobol.Item, err error) {
+	entries, err := scanEntries(src)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range entries {
+		if e.level == 1 {
+			return nil, fmt.Errorf("%d 行目: --fragment 指定ですが 01 レベルがあります（コピーブック断片は 01 レベルを含みません）", e.line)
+		}
+	}
+
+	pos := 0
+	items, err = buildSiblings(entries, &pos)
+	if err != nil {
+		return nil, err
+	}
+	if pos < len(entries) {
+		return nil, fmt.Errorf("%d 行目: レベル番号の階層が不正です", entries[pos].line)
+	}
+	return items, nil
+}
+
+// scanEntries はコピーブックのテキストを字句解析・構文解析して entry の列を返す。
+// Parse と ParseFragment が共有する前処理で、88 レベルなどレイアウトを持たない項目は
+// 読み飛ばす。
+func scanEntries(src []byte) ([]*entry, error) {
+	stmts, err := scanStatements(string(src))
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []*entry
+	for _, st := range stmts {
+		e, err := parseEntry(st)
+		if err != nil {
+			return nil, err
+		}
+		if e != nil { // nil は 88 レベルなど読み飛ばす項目
+			entries = append(entries, e)
+		}
+	}
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("コピーブックに項目がありません")
+	}
+	return entries, nil
 }
 
 // entry は解析済みの 1 つのデータ記述項目（レベル番号と各句）。

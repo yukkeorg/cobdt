@@ -265,11 +265,21 @@ data:
 
 ### コピーブック作成モード（create-copybook）
 
+```sh
+cdm create-copybook [--start-level N] <config.yaml> [output.cpy]
+```
+
 `record` を参照し、レコードの内容を記述したコピーブックを作成する。
 出力先を指定しない場合は標準出力へ出力する。
 
 レベル番号はレコード名（`name`）を 01 とし、`record` 直下の項目を 03 から始め、
 集団項目に入るたびにレベルを +2 する。
+
+`--start-level N` を指定すると、01 レコード行を出力しない**コピーブック断片**を生成する
+（語彙は `docs/CONTEXT.md`「コピーブック断片」、判断は [ADR 0003](adr/0003-copybook-fragment-explicit-flag.md) 参照）。
+このとき `record` 直下の項目を N（2〜49）から始め、集団項目ごとに +2 する。レコード全体を包む 01
+集団項目はプログラム側に置き、その中身をこの断片として COPY 句で埋め込む運用を想定する。
+完全モード・断片モードのいずれでも、生成されるレベル番号が COBOL の上限 49 を超える場合はエラーとする。
 
 各項目は次の規則で出力する。
 
@@ -288,11 +298,18 @@ data:
 ### コピーブック取り込みモード（import-copybook）
 
 ```sh
-cdm import-copybook <input.cpy> [output.yaml]   # コピーブックから設定 YAML を生成（省略時は標準出力）
+cdm import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]   # コピーブックから設定 YAML を生成（省略時は標準出力）
 ```
 
 既存の COBOL コピーブックを解析し、`create` / `dump` / `create-copybook` で使える設定 YAML を生成する
 （`create-copybook` の逆変換）。出力先を指定しない場合は標準出力へ出力する。
+
+`--fragment` を指定すると、01 レコード行を持たない**コピーブック断片**として取り込む
+（語彙は `docs/CONTEXT.md`「コピーブック断片」、判断は [ADR 0003](adr/0003-copybook-fragment-explicit-flag.md) 参照）。
+先頭エントリのレベルを最上位とみなして同一レベルの項目群を `record` とする。断片には 01 が含まれない
+前提のため、01 レベルが一つでも現れたらエラーとする（指定と現物の矛盾を黙って進めない）。断片には
+レコード名がないため、生成 YAML の `name` は `--name NAME`（既定 `DATA-RECORD`）で与える。`--fragment`
+を指定しない通常モードでは、従来どおり 01 で始まることを要求する。
 
 現実のコピーブックを対象とし、任意のレベル番号・列レイアウト（1–6 桁のシーケンス番号領域、
 7 桁目のコメント行）・継続行に対応する。ツリーはレベル番号の相対的な大小だけで復元する

@@ -231,3 +231,69 @@ func TestRoundTripThroughConfig(t *testing.T) {
 		t.Errorf("RecordLength = %d, want 48", got)
 	}
 }
+
+// TestGenerateFragment は断片モードが 01 行を出さず指定レベルから始まることを検証する。
+func TestGenerateFragment(t *testing.T) {
+	items := []*cobol.Item{
+		{Group: "EMP", Children: []*cobol.Item{
+			{Leaf: &cobol.Field{Name: "EMP-ID", Type: cobol.TypeNumeric, IntDigits: 5, Usage: cobol.UsageDisplay}},
+		}},
+		{Leaf: &cobol.Field{Name: "TAIL", Type: cobol.TypeAlphanumeric, Length: 3, Usage: cobol.UsageDisplay}},
+	}
+	out, err := GenerateFragment(items, 5)
+	if err != nil {
+		t.Fatalf("GenerateFragment: %v", err)
+	}
+	if strings.Contains(out, "01 ") {
+		t.Errorf("断片に 01 行が含まれています:\n%s", out)
+	}
+	if !strings.Contains(out, "05  EMP.") {
+		t.Errorf("最上位が 05 で始まっていません:\n%s", out)
+	}
+	if !strings.Contains(out, "07  EMP-ID") {
+		t.Errorf("従属項目が 07 になっていません:\n%s", out)
+	}
+
+	// 範囲外の開始レベルはエラー。
+	if _, err := GenerateFragment(items, 1); err == nil {
+		t.Errorf("start-level 1 はエラーになるべきです")
+	}
+	if _, err := GenerateFragment(items, 50); err == nil {
+		t.Errorf("start-level 50 はエラーになるべきです")
+	}
+	// 生成途中で 49 を超えたらエラー。
+	if _, err := GenerateFragment(items, 49); err == nil {
+		t.Errorf("49 始まりで従属項目が 51 になるためエラーになるべきです")
+	}
+}
+
+// TestParseFragment は 01 を持たない断片を取り込めること、断片に 01 が混ざればエラーに
+// なることを検証する。
+func TestParseFragment(t *testing.T) {
+	src := `       05  EMP.
+               07  EMP-ID    PIC 9(5).
+               07  EMP-NAME  PIC X(20).
+           05  TAIL          PIC X(3).
+`
+	items, err := ParseFragment([]byte(src))
+	if err != nil {
+		t.Fatalf("ParseFragment: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("len(items) = %d, want 2", len(items))
+	}
+	if !items[0].IsGroup() || items[0].Group != "EMP" {
+		t.Errorf("items[0] = %+v, want 集団項目 EMP", items[0])
+	}
+	if len(items[0].Children) != 2 {
+		t.Errorf("EMP の従属項目数 = %d, want 2", len(items[0].Children))
+	}
+
+	// 01 が混ざっていればエラー。
+	full := `       01  REC.
+           05  A  PIC X(2).
+`
+	if _, err := ParseFragment([]byte(full)); err == nil {
+		t.Errorf("01 を含む断片はエラーになるべきです")
+	}
+}

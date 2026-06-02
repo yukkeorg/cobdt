@@ -10,28 +10,54 @@ import (
 
 // Generate は record ツリーから COBOL コピーブックのテキストを生成する。
 // レコード名は 01 レベル、record 直下の項目は 03 レベルで始まり、
-// 集団項目に入るたびにレベルを +2 する。
-func Generate(recordName string, items []*cobol.Item) string {
+// 集団項目に入るたびにレベルを +2 する。ネストが深く生成レベルが 49 を
+// 超える場合はエラーを返す。
+func Generate(recordName string, items []*cobol.Item) (string, error) {
 	if strings.TrimSpace(recordName) == "" {
 		recordName = "DATA-RECORD"
 	}
 	var b strings.Builder
 	writeGroupLine(&b, 0, 1, recordName, 0, "")
-	writeItems(&b, items, 1)
-	return b.String()
+	if err := writeItems(&b, items, 3, 1); err != nil {
+		return "", err
+	}
+	return b.String(), nil
 }
 
-// writeItems は depth の階層（レベル = 2*depth+1）に items を書き出す。
-func writeItems(b *strings.Builder, items []*cobol.Item, depth int) {
-	level := 2*depth + 1
+// GenerateFragment は 01 レベルのレコード行を持たないコピーブック断片を生成する。
+// record 直下の項目を startLevel から始め、集団項目に入るたびにレベルを +2 する。
+// プログラム側で定義した 01 集団項目に COPY 句で埋め込む運用を想定する
+// （docs/CONTEXT.md「コピーブック断片」参照）。startLevel は 2〜49、生成レベルが
+// 49 を超える場合はエラーを返す。
+func GenerateFragment(items []*cobol.Item, startLevel int) (string, error) {
+	if startLevel < 2 || startLevel > 49 {
+		return "", fmt.Errorf("開始レベルは 2〜49 で指定してください: %d", startLevel)
+	}
+	var b strings.Builder
+	if err := writeItems(&b, items, startLevel, 0); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+// writeItems は level の階層（インデントは depth に対応）に items を書き出す。
+// 集団項目の従属項目はレベル +2・depth +1 で再帰的に書き出す。生成レベルが
+// COBOL の上限 49 を超えたらエラーを返す。
+func writeItems(b *strings.Builder, items []*cobol.Item, level, depth int) error {
+	if level > 49 {
+		return fmt.Errorf("生成されるレベル番号が 49 を超えました。開始レベルを下げるか、ネストを浅くしてください")
+	}
 	for _, it := range items {
 		if it.IsGroup() {
 			writeGroupLine(b, depth, level, it.Group, it.Occurs, it.Redefine)
-			writeItems(b, it.Children, depth+1)
+			if err := writeItems(b, it.Children, level+2, depth+1); err != nil {
+				return err
+			}
 		} else {
 			writeLeafLine(b, depth, level, it.Leaf, it.Occurs, it.Redefine)
 		}
 	}
+	return nil
 }
 
 // writeGroupLine は集団項目／レコード名の行（PICTURE 句なし）を書き出す。

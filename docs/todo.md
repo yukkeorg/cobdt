@@ -9,6 +9,9 @@
 - [x] コピーブック取り込みモード（import-copybook）
 - [x] 表意定数 LOW-VALUE / HIGH-VALUE への対応
 - [x] data の raw セル（数値項目への生バイト書き込み）
+- [x] コピーブック断片（01 を持たないコピーブック）の入出力対応
+      （create-copybook `--start-level N`、import-copybook `--fragment` / `--name`）。
+      `docs/adr/0003-copybook-fragment-explicit-flag.md`・`docs/CONTEXT.md`「コピーブック断片」参照。
 
 ## 未着手
 

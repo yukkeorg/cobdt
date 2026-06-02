@@ -10,6 +10,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -23,8 +24,13 @@ YAML 定義から COBOL 用データファイルを作成／解析するツー�
 使い方:
   cdm create          <config.yaml> <output.dat>   YAML の内容からデータファイルを作成
   cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
-  cdm create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成（省略時は標準出力）
-  cdm import-copybook <input.cpy>   [output.yaml]  COBOL コピーブックから設定 YAML を生成（省略時は標準出力）
+  cdm create-copybook [--start-level N] <config.yaml> [output.cpy]
+                                                   record 定義から COBOL コピーブックを生成（省略時は標準出力）
+                                                   --start-level N: 01 行を出さず N（2〜49）始まりの断片を生成
+  cdm import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]
+                                                   COBOL コピーブックから設定 YAML を生成（省略時は標準出力）
+                                                   --fragment: 01 を持たない断片として取り込む
+                                                   --name NAME: 断片モードで付けるレコード名（既定 DATA-RECORD）
 `)
 }
 
@@ -49,25 +55,36 @@ func main() {
 		}
 		err = app.Dump(os.Args[2], os.Args[3], os.Stdout)
 	case "create-copybook":
-		if len(os.Args) < 3 || len(os.Args) > 4 {
+		fs := flag.NewFlagSet("create-copybook", flag.ExitOnError)
+		fs.Usage = usage
+		startLevel := fs.Int("start-level", 0, "断片モードの開始レベル番号（2〜49）。指定すると 01 行を出さないコピーブック断片を生成する")
+		_ = fs.Parse(os.Args[2:])
+		args := fs.Args()
+		if len(args) < 1 || len(args) > 2 {
 			usage()
 			os.Exit(2)
 		}
 		output := ""
-		if len(os.Args) == 4 {
-			output = os.Args[3]
+		if len(args) == 2 {
+			output = args[1]
 		}
-		err = app.CreateCopybook(os.Args[2], output, os.Stdout)
+		err = app.CreateCopybook(args[0], output, *startLevel, os.Stdout)
 	case "import-copybook":
-		if len(os.Args) < 3 || len(os.Args) > 4 {
+		fs := flag.NewFlagSet("import-copybook", flag.ExitOnError)
+		fs.Usage = usage
+		fragment := fs.Bool("fragment", false, "01 レベルを持たないコピーブック断片として取り込む")
+		name := fs.String("name", "DATA-RECORD", "断片モードで生成 YAML に付けるレコード名")
+		_ = fs.Parse(os.Args[2:])
+		args := fs.Args()
+		if len(args) < 1 || len(args) > 2 {
 			usage()
 			os.Exit(2)
 		}
 		output := ""
-		if len(os.Args) == 4 {
-			output = os.Args[3]
+		if len(args) == 2 {
+			output = args[1]
 		}
-		err = app.ImportCopybook(os.Args[2], output, os.Stdout)
+		err = app.ImportCopybook(args[0], output, *fragment, *name, os.Stdout)
 	case "-h", "--help", "help":
 		usage()
 		return

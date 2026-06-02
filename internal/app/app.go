@@ -72,14 +72,25 @@ func Dump(configPath, inputPath string, stdout io.Writer) error {
 }
 
 // CreateCopybook は record 定義から COBOL コピーブックを生成する。
-// outputPath が空のときは stdout へ出力し、指定があればそのファイルへ書き出す。
-func CreateCopybook(configPath, outputPath string, stdout io.Writer) error {
+// startLevel が 0 のときは 01 レコード行つきの完全なコピーブックを、1 以上のときは
+// 01 を持たないコピーブック断片を startLevel から生成する（docs/CONTEXT.md
+// 「コピーブック断片」参照）。outputPath が空のときは stdout へ出力し、指定があれば
+// そのファイルへ書き出す。
+func CreateCopybook(configPath, outputPath string, startLevel int, stdout io.Writer) error {
 	spec, err := config.Load(configPath)
 	if err != nil {
 		return err
 	}
 
-	text := copybook.Generate(spec.Name, spec.Items)
+	var text string
+	if startLevel > 0 {
+		text, err = copybook.GenerateFragment(spec.Items, startLevel)
+	} else {
+		text, err = copybook.Generate(spec.Name, spec.Items)
+	}
+	if err != nil {
+		return err
+	}
 
 	if outputPath == "" {
 		fmt.Fprint(stdout, text)
@@ -93,19 +104,27 @@ func CreateCopybook(configPath, outputPath string, stdout io.Writer) error {
 }
 
 // ImportCopybook は COBOL コピーブックを解析し、cdm の設定 YAML を生成する。
+// fragment が true のときは 01 レベルを持たないコピーブック断片として取り込み、
+// 生成 YAML の name には引数 name を用いる（docs/CONTEXT.md「コピーブック断片」参照）。
 // outputPath が空のときは stdout へ出力し、指定があればそのファイルへ書き出す。
-func ImportCopybook(inputPath, outputPath string, stdout io.Writer) error {
+func ImportCopybook(inputPath, outputPath string, fragment bool, name string, stdout io.Writer) error {
 	src, err := os.ReadFile(inputPath)
 	if err != nil {
 		return err
 	}
 
-	name, items, err := copybook.Parse(src)
+	var items []*cobol.Item
+	recordName := name
+	if fragment {
+		items, err = copybook.ParseFragment(src)
+	} else {
+		recordName, items, err = copybook.Parse(src)
+	}
 	if err != nil {
 		return err
 	}
 
-	out, err := copybook.RenderYAML(name, items)
+	out, err := copybook.RenderYAML(recordName, items)
 	if err != nil {
 		return err
 	}
