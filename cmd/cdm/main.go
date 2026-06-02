@@ -6,6 +6,7 @@
 //	cdm create          <config.yaml> <output.dat>   YAML の内容からデータファイルを作成
 //	cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
 //	cdm create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成
+//	cdm import-copybook <input.cpy>   [output.yaml]  COBOL コピーブックから設定 YAML を生成
 package main
 
 import (
@@ -23,6 +24,7 @@ YAML 定義から COBOL 用データファイルを作成／解析するツー�
   cdm create          <config.yaml> <output.dat>   YAML の内容からデータファイルを作成
   cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
   cdm create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成（省略時は標準出力）
+  cdm import-copybook <input.cpy>   [output.yaml]  COBOL コピーブックから設定 YAML を生成（省略時は標準出力）
 `)
 }
 
@@ -56,6 +58,16 @@ func main() {
 			output = os.Args[3]
 		}
 		err = app.CreateCopybook(os.Args[2], output, os.Stdout)
+	case "import-copybook":
+		if len(os.Args) < 3 || len(os.Args) > 4 {
+			usage()
+			os.Exit(2)
+		}
+		output := ""
+		if len(os.Args) == 4 {
+			output = os.Args[3]
+		}
+		err = app.ImportCopybook(os.Args[2], output, os.Stdout)
 	case "-h", "--help", "help":
 		usage()
 		return

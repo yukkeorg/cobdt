@@ -91,3 +91,32 @@ func CreateCopybook(configPath, outputPath string, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "作成しました: %s\n", outputPath)
 	return nil
 }
+
+// ImportCopybook は COBOL コピーブックを解析し、cdm の設定 YAML を生成する。
+// outputPath が空のときは stdout へ出力し、指定があればそのファイルへ書き出す。
+func ImportCopybook(inputPath, outputPath string, stdout io.Writer) error {
+	src, err := os.ReadFile(inputPath)
+	if err != nil {
+		return err
+	}
+
+	name, items, err := copybook.Parse(src)
+	if err != nil {
+		return err
+	}
+
+	out, err := copybook.RenderYAML(name, items)
+	if err != nil {
+		return err
+	}
+
+	if outputPath == "" {
+		fmt.Fprint(stdout, string(out))
+		return nil
+	}
+	if err := os.WriteFile(outputPath, out, 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "作成しました: %s\n", outputPath)
+	return nil
+}
