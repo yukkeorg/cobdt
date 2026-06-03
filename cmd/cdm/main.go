@@ -3,7 +3,7 @@
 //
 // 使い方:
 //
-//	cdm create          <config.yaml> <output.dat>   YAML の内容からデータファイルを作成
+//	cdm create          [--data-yaml <data.yaml>] <config.yaml> <output.dat>  YAML の内容からデータファイルを作成
 //	cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
 //	cdm create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成
 //	cdm import-copybook <input.cpy>   [output.yaml]  COBOL コピーブックから設定 YAML を生成
@@ -22,7 +22,9 @@ func usage() {
 YAML 定義から COBOL 用データファイルを作成／解析するツール
 
 使い方:
-  cdm create          <config.yaml> <output.dat>   YAML の内容からデータファイルを作成
+  cdm create          [--data-yaml <data.yaml>] <config.yaml> <output.dat>
+                                                   YAML の内容からデータファイルを作成
+                                                   --data-yaml <data.yaml>: data 部を切り出した別 YAML から値を取り込む
   cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
   cdm create-copybook [--start-level N] <config.yaml> [output.cpy]
                                                    record 定義から COBOL コピーブックを生成（省略時は標準出力）
@@ -43,11 +45,16 @@ func main() {
 	var err error
 	switch os.Args[1] {
 	case "create":
-		if len(os.Args) != 4 {
+		fs := flag.NewFlagSet("create", flag.ExitOnError)
+		fs.Usage = usage
+		dataYAML := fs.String("data-yaml", "", "data 部だけを切り出した別 YAML ファイルから値を取り込む（inline の data を無視する）")
+		_ = fs.Parse(os.Args[2:])
+		args := fs.Args()
+		if len(args) != 2 {
 			usage()
 			os.Exit(2)
 		}
-		err = app.Create(os.Args[2], os.Args[3], os.Stdout)
+		err = app.Create(args[0], args[1], *dataYAML, os.Stdout)
 	case "dump":
 		if len(os.Args) != 4 {
 			usage()

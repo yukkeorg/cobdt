@@ -12,9 +12,16 @@
 - [x] コピーブック断片（01 を持たないコピーブック）の入出力対応
       （create-copybook `--start-level N`、import-copybook `--fragment` / `--name`）。
       `docs/adr/0003-copybook-fragment-explicit-flag.md`・`docs/CONTEXT.md`「コピーブック断片」参照。
+- [x] create モードの別ファイル YAML データ入力（`create --data-yaml <data.yaml>`）。`data` 部だけを
+      切り出した YAML を読み、inline `data` を無視する。フォーマットは inline `data` と同一（入れ子・
+      raw・表意定数フル対応）。`data:` 以外のキー・0 件・キー欠如はエラー。
+      `docs/design.md`「別ファイルの YAML データ入力」参照。
 
 ## 未着手
 
+- [ ] create モードの CSV データ入力（`create --data-csv <data.csv>`）。ヘッダ名で項目に対応づけ、
+      FILLER 非対応・OCCURS/再定義を含む record はエラー。`docs/design.md`「CSV からのデータ入力」・
+      `docs/adr/0004-csv-input-header-mapping.md` 参照。
 - [ ] EBCDIC（日本語 EBCDIC / DBCS）の N 項目エンコード・デコード実装
       （現状は `n-encode: ebcdic` を値として受け付けるが、エンコード・デコード時にエラー。
       Go 標準ライブラリ群に CP930/939 などの DBCS 変換がないため保留。`docs/design.md` 参照）

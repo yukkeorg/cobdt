@@ -13,10 +13,18 @@ import (
 )
 
 // Create は設定 YAML の内容を編成に従ってデータファイルへ書き出す。
-func Create(configPath, outputPath string, stdout io.Writer) error {
+// dataYAMLPath が空でないときは、書き込む値を inline の data ではなくその別 YAML
+// ファイルから取り込む（docs/design.md「別ファイルの YAML データ入力」参照）。
+func Create(configPath, outputPath, dataYAMLPath string, stdout io.Writer) error {
 	spec, err := config.Load(configPath)
 	if err != nil {
 		return err
+	}
+
+	if dataYAMLPath != "" {
+		if err := spec.LoadDataYAML(dataYAMLPath); err != nil {
+			return err
+		}
 	}
 
 	records, err := spec.BuildRecords()

@@ -287,6 +287,58 @@ func parseOccurs(m map[string]*yaml.Node) (int, error) {
 	return v, nil
 }
 
+// LoadDataYAML は --data-yaml で指定された別ファイルから data 行を読み込み、Spec の
+// data 行を差し替える。inline の data は無視される（呼び出し側がフラグ指定時に呼ぶ）。
+// ファイルはトップレベルに data キーだけを持つ必要があり、data 以外のキー・data キーの
+// 欠如・0 件はいずれもエラーとする（docs/design.md「別ファイルの YAML データ入力」参照）。
+func (s *Spec) LoadDataYAML(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(raw, &root); err != nil {
+		return fmt.Errorf("データ YAML の解析に失敗しました: %w", err)
+	}
+
+	// Unmarshal 先が *yaml.Node のときルートは DocumentNode。中身のマッピングを取り出す。
+	doc := &root
+	if root.Kind == yaml.DocumentNode {
+		if len(root.Content) == 0 {
+			return fmt.Errorf("データ YAML が空です: %s", path)
+		}
+		doc = root.Content[0]
+	}
+	if doc.Kind != yaml.MappingNode {
+		return fmt.Errorf("データ YAML はトップレベルに data キーを持つマッピングである必要があります: %s", path)
+	}
+
+	var dataNode *yaml.Node
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		key := doc.Content[i].Value
+		if key == "data" {
+			dataNode = doc.Content[i+1]
+			continue
+		}
+		return fmt.Errorf("データ YAML に data 以外のキーは指定できません: %q", key)
+	}
+	if dataNode == nil {
+		return fmt.Errorf("データ YAML に data キーが必要です: %s", path)
+	}
+
+	rows, err := parseDataRows(dataNode)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return fmt.Errorf("データ YAML の data が空です（最低 1 行が必要です）: %s", path)
+	}
+
+	s.rows = rows
+	return nil
+}
+
 // parseDataRows は data シーケンスを解析する。各行は record の構造（集団項目・表・
 // 再定義領域）に合わせて入れ子になりうるため、構造を保ったシーケンスノードのまま保持する。
 func parseDataRows(node *yaml.Node) ([]*yaml.Node, error) {
