@@ -1,4 +1,4 @@
-# cdm - Cobol Data Manipurator
+# cobdt - Cobol Data Tool
 
 ## 概要
 
@@ -12,7 +12,7 @@ YAML で記述したレコード定義をもとに、次の 3 つの操作を行
 ## プログラムの構成やルール
 
 - Go 言語を使用する。
-- コマンド作成用のソースコードは `cmd/cdm/main.go` に記述する。
+- コマンド作成用のソースコードは `cmd/cobdt/main.go` に記述する。
 - 可能な限りモジュール化を行いパッケージ化する。
 - パッケージ化したモジュールは `internal/` に配置する。
 - 外部ライブラリは次を利用する。
@@ -253,7 +253,7 @@ data:
 ### データ作成モード（create）
 
 ```sh
-cdm create [--data-csv <data.csv> | --data-yaml <data.yaml>] <config.yaml> <output.dat>
+cobdt create [--data-csv <data.csv> | --data-yaml <data.yaml>] <config.yaml> <output.dat>
 ```
 
 `record` を参照し、`organization` で指定された編成でデータファイルを作成する。書き込む値は既定では
@@ -323,7 +323,7 @@ create モードで `--data-yaml <data.yaml>` を指定すると、書き込む�
 ### コピーブック作成モード（create-copybook）
 
 ```sh
-cdm create-copybook [--start-level N] <config.yaml> [output.cpy]
+cobdt create-copybook [--start-level N] <config.yaml> [output.cpy]
 ```
 
 `record` を参照し、レコードの内容を記述したコピーブックを作成する。
@@ -355,7 +355,7 @@ cdm create-copybook [--start-level N] <config.yaml> [output.cpy]
 ### コピーブック取り込みモード（import-copybook）
 
 ```sh
-cdm import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]   # コピーブックから設定 YAML を生成（省略時は標準出力）
+cobdt import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]   # コピーブックから設定 YAML を生成（省略時は標準出力）
 ```
 
 既存の COBOL コピーブックを解析し、`create` / `dump` / `create-copybook` で使える設定 YAML を生成する
@@ -375,19 +375,19 @@ cdm import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]   # コ
 
 - **01 レベル**: コピーブックには 01 レベルが 1 つだけ現れることを要求する。その名を `name`、
   従属項目を `record` とする。複数の 01 レベルがある場合はエラーとする。
-- **VALUE 句**: 解釈するが、cdm の既定値（数値項目は `ZERO`、それ以外は `SPACE`）と一致するものは
+- **VALUE 句**: 解釈するが、cobdt の既定値（数値項目は `ZERO`、それ以外は `SPACE`）と一致するものは
   `value` を省略し、非既定値のみ `value` として出力する。
 - **無視する要素**: 88 レベル（条件名）、コメント行、シーケンス番号領域は読み飛ばす。
 - **補完するキー**: コピーブックが持たない `organization`（`sequential`）・`n-encode`（`sjis`）は
   既定値として明示出力し、`data` はコメントの雛形と空リストを出力する。`create` に使うには
   ユーザが `data` を追記する。
 
-cdm のモデルで表現できない構文に遭遇した場合は、best-effort 変換やスキップをせず、行と項目を
+cobdt のモデルで表現できない構文に遭遇した場合は、best-effort 変換やスキップをせず、行と項目を
 示してエラーで中断する（[ADR 0002](adr/0002-import-copybook-strict-subset.md) 参照）。
 具体的には次を未対応とする。
 
 - バイナリ数値: `COMP` / `BINARY` / `COMP-1` / `COMP-2` / `COMP-4` / `COMP-5`
-- 編集用 PICTURE: `Z`・`,`・`.`・`$`・`+`・`-`・`A`（英字）・`B`・`/` など、cdm 許容文字集合
+- 編集用 PICTURE: `Z`・`,`・`.`・`$`・`+`・`-`・`A`（英字）・`B`・`/` など、cobdt 許容文字集合
   `{9 X N S V ( ) 数字}` 以外を含む PICTURE
 - `SYNC`（SYNCHRONIZED。詰めバイトでレコード長が変わる）、`JUSTIFIED`、`BLANK WHEN ZERO`
 - `OCCURS n DEPENDING ON`（可変長テーブル）

@@ -1,4 +1,4 @@
-# cdm
+# cobdt
 
 YAML で記述したレコード定義をもとに、COBOL の固定長データファイルの作成（create）・ダンプ（dump）・コピーブック生成（create-copybook）を行うコマンドラインツール。本書はその語彙を定義する。
 

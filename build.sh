@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PROGNAME=${PROGNAME:-cdm}
+export PROGNAME=${PROGNAME:-cobdt}
 
 export GOOS=${GOOS:-linux}
 export GOARCH=${GOARCH:-amd64}
@@ -14,7 +14,7 @@ if [ "${GOOS}" = "windows" ]; then
     binary="${binary}.exe"
 fi
 
-go build -trimpath -ldflags="-s -w" -o "dist/${binary}" ./cmd/cdm
+go build -trimpath -ldflags="-s -w" -o "dist/${binary}" ./cmd/cobdt
 
 asset_dir="${PROGNAME}_${RELEASE_TAG}_${GOOS}_${GOARCH}"
 mkdir -p "dist/${asset_dir}"

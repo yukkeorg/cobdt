@@ -6,10 +6,10 @@ import (
 	"io"
 	"os"
 
-	"yukkeorg/internal/cobol"
-	"yukkeorg/internal/config"
-	"yukkeorg/internal/copybook"
-	"yukkeorg/internal/datafile"
+	"yukkeorg/cobdt/internal/cobol"
+	"yukkeorg/cobdt/internal/config"
+	"yukkeorg/cobdt/internal/copybook"
+	"yukkeorg/cobdt/internal/datafile"
 )
 
 // Create は設定 YAML の内容を編成に従ってデータファイルへ書き出す。
@@ -111,7 +111,7 @@ func CreateCopybook(configPath, outputPath string, startLevel int, stdout io.Wri
 	return nil
 }
 
-// ImportCopybook は COBOL コピーブックを解析し、cdm の設定 YAML を生成する。
+// ImportCopybook は COBOL コピーブックを解析し、cobdt の設定 YAML を生成する。
 // fragment が true のときは 01 レベルを持たないコピーブック断片として取り込み、
 // 生成 YAML の name には引数 name を用いる（docs/CONTEXT.md「コピーブック断片」参照）。
 // outputPath が空のときは stdout へ出力し、指定があればそのファイルへ書き出す。

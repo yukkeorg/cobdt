@@ -1,4 +1,4 @@
-module yukkeorg
+module yukkeorg/cobdt
 
 go 1.26.3
 

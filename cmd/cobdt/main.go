@@ -1,12 +1,12 @@
-// cdm (Cobol Data Manipurator) は YAML 定義から COBOL が読めるデータファイルを
+// cobdt (Cobol Data Tool) は YAML 定義から COBOL が読めるデータファイルを
 // 作成（create）し、既存のデータファイルを定義に従って解析・表示（dump）するツールです。
 //
 // 使い方:
 //
-//	cdm create          [--data-yaml <data.yaml>] <config.yaml> <output.dat>  YAML の内容からデータファイルを作成
-//	cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
-//	cdm create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成
-//	cdm import-copybook <input.cpy>   [output.yaml]  COBOL コピーブックから設定 YAML を生成
+//	cobdt create          [--data-yaml <data.yaml>] <config.yaml> <output.dat>  YAML の内容からデータファイルを作成
+//	cobdt dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
+//	cobdt create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成
+//	cobdt import-copybook <input.cpy>   [output.yaml]  COBOL コピーブックから設定 YAML を生成
 package main
 
 import (
@@ -14,22 +14,22 @@ import (
 	"fmt"
 	"os"
 
-	"yukkeorg/internal/app"
+	"yukkeorg/cobdt/internal/app"
 )
 
 func usage() {
-	fmt.Fprint(os.Stderr, `cdm - Cobol Data Manipurator
+	fmt.Fprint(os.Stderr, `cobdt - Cobol Data Tool
 YAML 定義から COBOL 用データファイルを作成／解析するツール
 
 使い方:
-  cdm create          [--data-yaml <data.yaml>] <config.yaml> <output.dat>
+  cobdt create          [--data-yaml <data.yaml>] <config.yaml> <output.dat>
                                                    YAML の内容からデータファイルを作成
                                                    --data-yaml <data.yaml>: data 部を切り出した別 YAML から値を取り込む
-  cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
-  cdm create-copybook [--start-level N] <config.yaml> [output.cpy]
+  cobdt dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
+  cobdt create-copybook [--start-level N] <config.yaml> [output.cpy]
                                                    record 定義から COBOL コピーブックを生成（省略時は標準出力）
                                                    --start-level N: 01 行を出さず N（2〜49）始まりの断片を生成
-  cdm import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]
+  cobdt import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]
                                                    COBOL コピーブックから設定 YAML を生成（省略時は標準出力）
                                                    --fragment: 01 を持たない断片として取り込む
                                                    --name NAME: 断片モードで付けるレコード名（既定 DATA-RECORD）

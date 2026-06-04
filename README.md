@@ -1,4 +1,4 @@
-# cdm - Cobol Data Manipurator
+# cobdt - Cobol Data Tool
 
 YAML 定義から COBOL 言語で利用するデータファイルを作成・解析するコマンドラインツールです。
 
@@ -26,7 +26,7 @@ YAML 定義から COBOL 言語で利用するデータファイルを作成・�
 ## ビルド
 
 ```sh
-go build -o cdm ./cmd/cdm
+go build -o cobdt ./cmd/cobdt
 ```
 
 テストの実行:
@@ -47,12 +47,12 @@ git push origin v0.1.0
 
 作成される成果物:
 
-- `cdm_<tag>_linux_amd64.tar.gz`
-- `cdm_<tag>_linux_arm64.tar.gz`
-- `cdm_<tag>_darwin_amd64.tar.gz`
-- `cdm_<tag>_darwin_arm64.tar.gz`
-- `cdm_<tag>_windows_amd64.zip`
-- `cdm_<tag>_windows_arm64.zip`
+- `cobdt_<tag>_linux_amd64.tar.gz`
+- `cobdt_<tag>_linux_arm64.tar.gz`
+- `cobdt_<tag>_darwin_amd64.tar.gz`
+- `cobdt_<tag>_darwin_arm64.tar.gz`
+- `cobdt_<tag>_windows_amd64.zip`
+- `cobdt_<tag>_windows_arm64.zip`
 - `checksums.txt`
 
 GitHub Actions の `Release` workflow を手動実行し、`tag` に既存タグ名を指定して発行することもできます。
@@ -60,9 +60,9 @@ GitHub Actions の `Release` workflow を手動実行し、`tag` に既存タグ
 ## 使い方
 
 ```text
-cdm create          <config.yaml> <output.dat>   YAML の内容からデータファイルを作成
-cdm dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
-cdm create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成（省略時は標準出力）
+cobdt create          <config.yaml> <output.dat>   YAML の内容からデータファイルを作成
+cobdt dump            <config.yaml> <input.dat>    データファイルを解析してコンソールへ表示
+cobdt create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コピーブックを生成（省略時は標準出力）
 ```
 
 ### データ作成（create）
@@ -70,7 +70,7 @@ cdm create-copybook <config.yaml> [output.cpy]   record 定義から COBOL コ�
 `record` を参照し、`organization` で指定された編成で、`data` の内容を持つデータファイルを作成します。
 
 ```sh
-cdm create example.yaml output.dat
+cobdt create example.yaml output.dat
 ```
 
 ### データダンプ（dump）
@@ -78,7 +78,7 @@ cdm create example.yaml output.dat
 データファイルを `organization` で指定された編成で読み込み、`record` で解析して、項目名・型名・値を標準出力へ表示します。
 
 ```sh
-cdm dump example.yaml output.dat
+cobdt dump example.yaml output.dat
 ```
 
 ### コピーブック作成（create-copybook）
@@ -86,7 +86,7 @@ cdm dump example.yaml output.dat
 `record` の定義から COBOL コピーブックを生成します。出力先を省略すると標準出力へ出力します。
 
 ```sh
-cdm create-copybook example.yaml record.cpy
+cobdt create-copybook example.yaml record.cpy
 ```
 
 レベル番号はレコード名（`name`）を 01 とし、`record` 直下の項目を 03 から始め、集団項目に入るたびに +2 します。
@@ -287,9 +287,9 @@ data:
 | `extra/redefine_example.yaml` | 再定義（REDEFINES）の例。レコード種別で後続の意味が変わるレイアウト |
 
 ```sh
-cdm create-copybook extra/redefine_example.yaml
-cdm create          extra/redefine_example.yaml output.dat
-cdm dump            extra/redefine_example.yaml output.dat
+cobdt create-copybook extra/redefine_example.yaml
+cobdt create          extra/redefine_example.yaml output.dat
+cobdt dump            extra/redefine_example.yaml output.dat
 ```
 
 ## ライセンス

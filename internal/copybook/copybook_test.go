@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"yukkeorg/internal/cobol"
-	"yukkeorg/internal/config"
+	"yukkeorg/cobdt/internal/cobol"
+	"yukkeorg/cobdt/internal/config"
 )
 
 func TestParseBasic(t *testing.T) {

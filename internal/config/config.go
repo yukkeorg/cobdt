@@ -10,8 +10,8 @@ import (
 
 	yaml "go.yaml.in/yaml/v4"
 
-	"yukkeorg/internal/cobol"
-	"yukkeorg/internal/datafile"
+	"yukkeorg/cobdt/internal/cobol"
+	"yukkeorg/cobdt/internal/datafile"
 )
 
 // rawConfig は設定 YAML 全体のマッピングを表す。

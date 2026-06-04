@@ -1,17 +1,17 @@
 #!/bin/sh
-# cdm インストールスクリプト
+# cobdt インストールスクリプト
 #
 # 使い方:
-#   curl -sSL https://raw.githubusercontent.com/yukkeorg/cdm/main/install.sh | sh
+#   curl -sSL https://raw.githubusercontent.com/yukkeorg/cobdt/main/install.sh | sh
 #
 # 環境変数で挙動を変更できる:
-#   CDM_VERSION      インストールするバージョン (例: v1.0.0)。未指定なら latest。
-#   CDM_INSTALL_DIR  インストール先ディレクトリ。未指定なら自動判定。
+#   COBDT_VERSION      インストールするバージョン (例: v1.0.0)。未指定なら latest。
+#   COBDT_INSTALL_DIR  インストール先ディレクトリ。未指定なら自動判定。
 #
 set -eu
 
-REPO="yukkeorg/cdm"
-PROGNAME="cdm"
+REPO="yukkeorg/cobdt"
+PROGNAME="cobdt"
 
 # --- ログ出力 ----------------------------------------------------------------
 
@@ -73,7 +73,7 @@ latest_version() {
     api_url="https://api.github.com/repos/${REPO}/releases/latest"
     tag="$($DOWNLOAD_STDOUT "$api_url" | grep '"tag_name"' | head -n1 | cut -d'"' -f4)"
     if [ -z "$tag" ]; then
-        err "Failed to fetch the latest version. Please specify CDM_VERSION explicitly."
+        err "Failed to fetch the latest version. Please specify COBDT_VERSION explicitly."
     fi
     echo "$tag"
 }
@@ -81,8 +81,8 @@ latest_version() {
 # --- インストール先の決定 ----------------------------------------------------
 
 choose_install_dir() {
-    if [ -n "${CDM_INSTALL_DIR:-}" ]; then
-        echo "$CDM_INSTALL_DIR"
+    if [ -n "${COBDT_INSTALL_DIR:-}" ]; then
+        echo "$COBDT_INSTALL_DIR"
         return
     fi
     # 書き込み可能なら /usr/local/bin、なければ ~/.local/bin
@@ -101,7 +101,7 @@ main() {
     OS="$(detect_os)"
     ARCH="$(detect_arch)"
 
-    VERSION="${CDM_VERSION:-}"
+    VERSION="${COBDT_VERSION:-}"
     if [ -z "$VERSION" ]; then
         info "Fetching the latest version..."
         VERSION="$(latest_version)"
@@ -147,7 +147,7 @@ main() {
     info "Extracting..."
     tar -C "$tmpdir" -xzf "${tmpdir}/${asset}"
 
-    # アーカイブ内のバイナリを探す (cdm_<TAG>_<OS>_<ARCH>/cdm)
+    # アーカイブ内のバイナリを探す (cobdt_<TAG>_<OS>_<ARCH>/cobdt)
     binary="$(find "$tmpdir" -type f -name "$PROGNAME" | head -n1)"
     if [ -z "$binary" ]; then
         err "Could not find the ${PROGNAME} binary in the archive."
@@ -167,7 +167,7 @@ main() {
         info "Using sudo to write to ${INSTALL_DIR}"
         sudo install -m 0755 "$binary" "$dest"
     else
-        err "Cannot write to ${INSTALL_DIR}. Specify another location with CDM_INSTALL_DIR."
+        err "Cannot write to ${INSTALL_DIR}. Specify another location with COBDT_INSTALL_DIR."
     fi
 
     info "Installation complete: ${dest}"

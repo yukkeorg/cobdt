@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"yukkeorg/internal/cobol"
+	"yukkeorg/cobdt/internal/cobol"
 )
 
 // Generate は record ツリーから COBOL コピーブックのテキストを生成する。

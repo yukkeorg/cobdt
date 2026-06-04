@@ -8,11 +8,11 @@ import (
 
 	yaml "go.yaml.in/yaml/v4"
 
-	"yukkeorg/internal/cobol"
+	"yukkeorg/cobdt/internal/cobol"
 )
 
 // Parse は COBOL コピーブックのテキストを解析し、レコード名（01 レベル名）と
-// record の木構造を返す。cdm のモデルで表現できない構文に遭遇した場合は
+// record の木構造を返す。cobdt のモデルで表現できない構文に遭遇した場合は
 // best-effort 変換やスキップをせず、行と項目を示してエラーを返す
 // （docs/adr/0002-import-copybook-strict-subset.md 参照）。
 func Parse(src []byte) (name string, items []*cobol.Item, err error) {
@@ -43,7 +43,7 @@ func Parse(src []byte) (name string, items []*cobol.Item, err error) {
 	if pos < len(entries) {
 		rest := entries[pos]
 		if rest.level == 1 {
-			return "", nil, fmt.Errorf("%d 行目: 01 レベルが複数あります（cdm は単一レコードのみ対応します）", rest.line)
+			return "", nil, fmt.Errorf("%d 行目: 01 レベルが複数あります（cobdt は単一レコードのみ対応します）", rest.line)
 		}
 		return "", nil, fmt.Errorf("%d 行目: レベル番号の階層が不正です", rest.line)
 	}
@@ -173,7 +173,7 @@ func buildSiblings(entries []*entry, pos *int) ([]*cobol.Item, error) {
 	return items, nil
 }
 
-// buildLeaf は entry から基本項目／FILLER の Field を構築する。FILLER は cdm の
+// buildLeaf は entry から基本項目／FILLER の Field を構築する。FILLER は cobdt の
 // モデルに合わせて、同一バイト数の X 項目（FILLER(n)）として表現する。
 func buildLeaf(e *entry) (*cobol.Field, error) {
 	if err := validatePic(e.pic, e.line); err != nil {
@@ -203,7 +203,7 @@ func buildLeaf(e *entry) (*cobol.Field, error) {
 	return f, nil
 }
 
-// validatePic は cdm が表現できる PICTURE 文字集合 {9 X N S V ( ) 数字} のみで
+// validatePic は cobdt が表現できる PICTURE 文字集合 {9 X N S V ( ) 数字} のみで
 // 構成されているかを検証する。Z・,・.・$・A などの編集用記号を弾く。
 func validatePic(pic string, line int) error {
 	for _, r := range strings.ToUpper(pic) {
@@ -317,7 +317,7 @@ func parseEntry(st stmt) (*entry, error) {
 				switch strings.ToUpper(val) {
 				case "ZERO", "ZEROS", "ZEROES", "SPACE", "SPACES",
 					"LOW-VALUE", "LOW-VALUES", "HIGH-VALUE", "HIGH-VALUES":
-					// cdm が対応する表意定数
+					// cobdt が対応する表意定数
 				case "QUOTE", "QUOTES", "NULL", "NULLS":
 					return nil, fmt.Errorf("%d 行目: 未対応の表意定数です: %s", st.line, val)
 				}
@@ -581,7 +581,7 @@ func tokenize(s string) []string {
 
 // ---- YAML 生成 ----
 
-// RenderYAML は record の木構造を cdm の設定 YAML に変換する。コピーブックが持たない
+// RenderYAML は record の木構造を cobdt の設定 YAML に変換する。コピーブックが持たない
 // organization / n-encode は既定値を明示出力し、data はコメント付きの空リストを出力する。
 func RenderYAML(name string, items []*cobol.Item) ([]byte, error) {
 	if strings.TrimSpace(name) == "" {
@@ -591,7 +591,7 @@ func RenderYAML(name string, items []*cobol.Item) ([]byte, error) {
 	root := &yaml.Node{Kind: yaml.MappingNode}
 
 	nameKey := scalar("name")
-	nameKey.HeadComment = "cdm import-copybook が生成しました。organization・n-encode・data は必要に応じて編集してください。"
+	nameKey.HeadComment = "cobdt import-copybook が生成しました。organization・n-encode・data は必要に応じて編集してください。"
 	addPair(root, nameKey, scalar(name))
 	addPair(root, scalar("organization"), scalar("sequential"))
 	addPair(root, scalar("n-encode"), scalar("sjis"))
@@ -665,7 +665,7 @@ func itemNode(it *cobol.Item) *yaml.Node {
 	return m
 }
 
-// valueNode は value キーに出力すべきノードを返す。cdm の既定値（数値=ZERO/他=SPACE）と
+// valueNode は value キーに出力すべきノードを返す。cobdt の既定値（数値=ZERO/他=SPACE）と
 // 一致する場合や未指定の場合は (nil, false) を返して省略する。
 func valueNode(f *cobol.Field) (*yaml.Node, bool) {
 	if !f.HasValue {
