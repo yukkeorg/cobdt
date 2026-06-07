@@ -26,10 +26,20 @@ import (
 	"yukkeorg/cobdt/internal/app"
 )
 
+// バージョン情報。リリースビルドでは build.sh が ldflags（-X main.version=… など）で
+// 値を埋め込む。ldflags を渡さない素の go build / go run では既定値のままになり、
+// リリース版でないことが分かる（docs/design.md「バージョン表示」参照）。
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	cmd := &cli.Command{
-		Name:                  "cdm",
+		Name:                  "cobdt",
 		Usage:                 "YAML 定義から COBOL 用データファイルを作成／解析するツール",
+		Version:               fmt.Sprintf("%s (commit %s, built %s)", version, commit, date),
 		HideHelpCommand:       true,
 		EnableShellCompletion: true,
 		// 既定のエラーハンドラを差し替え、メッセージを「エラー: …」で統一する。

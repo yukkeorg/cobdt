@@ -252,6 +252,20 @@ data:
 
 コマンドラインの解析には `urfave/cli` v3 を用いる（判断は [ADR 0005](adr/0005-urfave-cli-v3.md) 参照）。
 
+#### バージョン表示（-v / --version）
+
+`-v` / `--version` を付けて実行すると、バージョン情報を 1 行で表示して終了する。
+
+```
+cobdt version v1.0.0 (commit abc1234, built 2026-06-07)
+```
+
+バージョン・コミット・ビルド日は、リリースビルド時に `build.sh` が ldflags
+（`-X main.version=…` など）で埋め込む。`version` はリリースタグ（`release.yml` が
+`RELEASE_TAG` に渡す。ローカルの `build.sh` 実行では `local`）、`commit` は短縮 SHA、
+`built` はビルド日（UTC）。ldflags を渡さない素の `go build` / `go run` では既定値
+（`dev` / `none` / `unknown`）のままになり、リリース版でないことが分かる。
+
 #### 出力先の指定（共通規約）
 
 ファイルを出力するモード（`create` / `create-copybook` / `import-copybook`）の出力先は、
