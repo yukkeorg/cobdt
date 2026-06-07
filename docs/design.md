@@ -250,13 +250,41 @@ data:
 | `create-copybook` | コピーブック作成モード |
 | `import-copybook` | コピーブック取り込みモード |
 
+コマンドラインの解析には `urfave/cli` v3 を用いる（判断は [ADR 0005](adr/0005-urfave-cli-v3.md) 参照）。
+
+#### 出力先の指定（共通規約）
+
+ファイルを出力するモード（`create` / `create-copybook` / `import-copybook`）の出力先は、
+`-o` / `--output <path>` オプションで指定する。**オプションを省略した場合は標準出力へ出力する**。
+入力ファイル（`config.yaml` など）は引き続き位置引数で受け取る。
+
+- **データは標準出力、診断は標準エラー出力**: 生成物（データファイル・コピーブック・YAML）は
+  `-o` 省略時に標準出力へ流す。「作成しました: …」などの確認・進捗メッセージは、`-o` の有無に
+  かかわらず**常に標準エラー出力**へ出す。これにより `cdm create config.yaml | …` のような
+  パイプで生成物だけを正しく受け渡せる。
+- **バイナリの標準出力と TTY ガード**: `create` は固定長バイナリを出力する。`-o` を省略し、かつ
+  標準出力が端末（TTY）に直結している場合は、画面をバイナリで壊さないようエラーで停止する
+  （`-o` で出力先を指定するか、パイプ／リダイレクトを促す）。標準出力がパイプ・リダイレクト・
+  ファイルなら、そのままバイナリを流す。TTY 判定は標準ライブラリの `os.ModeCharDevice` で行い、
+  外部依存は増やさない。テキストを出力する `create-copybook` / `import-copybook` は端末に出ても
+  無害なため、このガードは行わない。
+- `dump` は解析結果を人が読む表示であり、従来どおり常に標準出力へ表示する（`-o` は持たない）。
+
 ### データ作成モード（create）
 
 ```sh
+<<<<<<< HEAD
 cobdt create [--data-csv <data.csv> | --data-yaml <data.yaml>] <config.yaml> <output.dat>
+||||||| parent of b419a7c (出力先指定を -o/--output に統一し標準出力を既定にする)
+cdm create [--data-csv <data.csv> | --data-yaml <data.yaml>] <config.yaml> <output.dat>
+=======
+cdm create [--data-csv <data.csv> | --data-yaml <data.yaml>] [-o <output.dat>] <config.yaml>
+>>>>>>> b419a7c (出力先指定を -o/--output に統一し標準出力を既定にする)
 ```
 
-`record` を参照し、`organization` で指定された編成でデータファイルを作成する。書き込む値は既定では
+`record` を参照し、`organization` で指定された編成でデータファイルを作成する。`-o` を省略すると
+固定長バイナリを標準出力へ出力するが、標準出力が端末のときはエラーで停止する（前述
+「出力先の指定（共通規約）」の TTY ガード）。書き込む値は既定では
 YAML の inline `data` から取るが、外部ファイルから取り込むこともできる。
 
 - `--data-csv <data.csv>`: CSV ファイルから取り込む
@@ -323,11 +351,17 @@ create モードで `--data-yaml <data.yaml>` を指定すると、書き込む�
 ### コピーブック作成モード（create-copybook）
 
 ```sh
+<<<<<<< HEAD
 cobdt create-copybook [--start-level N] <config.yaml> [output.cpy]
+||||||| parent of b419a7c (出力先指定を -o/--output に統一し標準出力を既定にする)
+cdm create-copybook [--start-level N] <config.yaml> [output.cpy]
+=======
+cdm create-copybook [--start-level N] [-o <output.cpy>] <config.yaml>
+>>>>>>> b419a7c (出力先指定を -o/--output に統一し標準出力を既定にする)
 ```
 
 `record` を参照し、レコードの内容を記述したコピーブックを作成する。
-出力先を指定しない場合は標準出力へ出力する。
+`-o` を省略した場合は標準出力へ出力する（前述「出力先の指定（共通規約）」）。
 
 レベル番号はレコード名（`name`）を 01 とし、`record` 直下の項目を 03 から始め、
 集団項目に入るたびにレベルを +2 する。
@@ -355,11 +389,17 @@ cobdt create-copybook [--start-level N] <config.yaml> [output.cpy]
 ### コピーブック取り込みモード（import-copybook）
 
 ```sh
+<<<<<<< HEAD
 cobdt import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]   # コピーブックから設定 YAML を生成（省略時は標準出力）
+||||||| parent of b419a7c (出力先指定を -o/--output に統一し標準出力を既定にする)
+cdm import-copybook [--fragment] [--name NAME] <input.cpy> [output.yaml]   # コピーブックから設定 YAML を生成（省略時は標準出力）
+=======
+cdm import-copybook [--fragment] [--name NAME] [-o <output.yaml>] <input.cpy>   # コピーブックから設定 YAML を生成（-o 省略時は標準出力）
+>>>>>>> b419a7c (出力先指定を -o/--output に統一し標準出力を既定にする)
 ```
 
 既存の COBOL コピーブックを解析し、`create` / `dump` / `create-copybook` で使える設定 YAML を生成する
-（`create-copybook` の逆変換）。出力先を指定しない場合は標準出力へ出力する。
+（`create-copybook` の逆変換）。`-o` を省略した場合は標準出力へ出力する（前述「出力先の指定（共通規約）」）。
 
 `--fragment` を指定すると、01 レコード行を持たない**コピーブック断片**として取り込む
 （語彙は `docs/CONTEXT.md`「コピーブック断片」、判断は [ADR 0003](adr/0003-copybook-fragment-explicit-flag.md) 参照）。

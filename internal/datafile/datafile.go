@@ -42,26 +42,21 @@ func (o Organization) String() string {
 	}
 }
 
-// WriteRecords はレコード群を編成に応じてファイルへ書き出す。
+// WriteRecords はレコード群を編成に応じて w へ書き出す。
 // 行順編成では各レコードの末尾に改行（LF）を付加する。
-func WriteRecords(path string, org Organization, records [][]byte) error {
-	out, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
+// 出力先（ファイルか標準出力か）の解決と open/close は呼び出し側の責務とする。
+func WriteRecords(w io.Writer, org Organization, records [][]byte) error {
 	for _, rec := range records {
-		if _, err := out.Write(rec); err != nil {
+		if _, err := w.Write(rec); err != nil {
 			return err
 		}
 		if org == OrgLineSequential {
-			if _, err := out.Write([]byte{'\n'}); err != nil {
+			if _, err := w.Write([]byte{'\n'}); err != nil {
 				return err
 			}
 		}
 	}
-	return out.Close()
+	return nil
 }
 
 // ReadRecords は編成に応じてファイルからレコード群を読み込む。

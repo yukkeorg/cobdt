@@ -33,7 +33,14 @@ func TestSequentialRoundTrip(t *testing.T) {
 	path := filepath.Join(dir, "seq.dat")
 	recs := [][]byte{[]byte("ABC"), []byte("DEF")}
 
-	if err := WriteRecords(path, OrgSequential, recs); err != nil {
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteRecords(f, OrgSequential, recs); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
 	raw, _ := os.ReadFile(path)
@@ -55,7 +62,14 @@ func TestLineSequentialRoundTrip(t *testing.T) {
 	path := filepath.Join(dir, "line.dat")
 	recs := [][]byte{[]byte("ABC"), []byte("DEFGH")}
 
-	if err := WriteRecords(path, OrgLineSequential, recs); err != nil {
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteRecords(f, OrgLineSequential, recs); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
 	raw, _ := os.ReadFile(path)
